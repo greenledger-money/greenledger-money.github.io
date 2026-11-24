@@ -161,6 +161,7 @@ export default function Home() {
       </label>
       <button className="iconbtn" aria-label="設定" onClick={() => go('settings')}><Icon name="gear" /></button>
     </>}>
+      {homeShowWorth && <WorthCard />}
       <div className="card" style={{ padding: '10px 8px 14px', display: 'grid', gap: 12 }}
         onTouchStart={(e) => { touch.current = e.touches[0].clientX; }}
         onTouchEnd={(e) => { const dx = e.changedTouches[0].clientX - (touch.current ?? 0); if (Math.abs(dx) > 50) shiftWeek(dx < 0 ? 1 : -1); touch.current = null; }}>
@@ -197,7 +198,6 @@ export default function Home() {
 
       <PendingList />
       {homeShowTemplates && <TemplateBar />}
-      {homeShowWorth && <WorthCard />}
     </Page>
   );
 }
