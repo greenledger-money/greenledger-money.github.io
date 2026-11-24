@@ -95,7 +95,7 @@ export function CategoryPicker({ kind, value, onPick, onClose }) {
               {value === n.id && <Icon name="check" className="chev" />}
             </button>
             {n.children.some((c) => !c.archived) && (
-              <button className="iconbtn" aria-label={`看「${n.name}」的子分類`} onClick={() => setParentId(n.id)} style={{ borderLeft: '1px solid var(--line)', borderRadius: 0, width: 56, height: 52 }}>
+              <button className="iconbtn" aria-label={`看「${n.name}」的子分類`} onClick={() => setParentId(n.id)} style={{ borderLeft: '1px solid var(--line)', borderRadius: 0, width: 64, height: 'auto', alignSelf: 'stretch', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
                 <span className="small muted" style={{ marginRight: 2 }}>{n.children.filter((c) => !c.archived).length}</span><Icon name="chev" />
               </button>
             )}

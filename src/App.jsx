@@ -7,7 +7,7 @@ import Auth, { NewPassword } from './pages/Auth.jsx';
 import Home from './pages/Home.jsx';
 import Accounts, { AccountDetail } from './pages/Accounts.jsx';
 import Transactions from './pages/Transactions.jsx';
-import Reports from './pages/Reports.jsx';
+import Reports, { ReportCategory, ReportTxns } from './pages/Reports.jsx';
 import Stocks, { StockDetail, TradeSheet } from './pages/Stocks.jsx';
 import { Categories, More, Recurring, Templates } from './pages/Manage.jsx';
 import Import from './pages/Import.jsx';
@@ -41,7 +41,7 @@ const TABS = [
   { name: 'reports', label: '報表', icon: 'chart' },
   { name: 'more', label: '更多', icon: 'more' },
 ];
-const TAB_OF = { account: 'accounts', transactions: 'more', stocks: 'more', stock: 'more', templates: 'more', recurring: 'more', categories: 'more', import: 'more', export: 'more', settings: 'more', privacy: 'more' };
+const TAB_OF = { rcat: 'reports', rtx: 'reports', account: 'accounts', transactions: 'more', stocks: 'more', stock: 'more', templates: 'more', recurring: 'more', categories: 'more', import: 'more', export: 'more', settings: 'more', privacy: 'more' };
 
 function Shell({ openEntry }) {
   const { status, data, actions, backend } = useLedger();
@@ -67,6 +67,8 @@ function Shell({ openEntry }) {
     case 'account': page = <AccountDetail id={route.arg} key={route.arg} />; break;
     case 'transactions': page = <Transactions />; break;
     case 'reports': page = <Reports />; break;
+    case 'rcat': page = <ReportCategory id={route.arg} key={route.arg} />; break;
+    case 'rtx': page = <ReportTxns id={route.arg} key={route.arg} />; break;
     case 'more': page = <More />; break;
     case 'stocks': page = <Stocks />; break;
     case 'stock': page = <StockDetail id={route.arg} key={route.arg} />; break;
