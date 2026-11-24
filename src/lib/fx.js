@@ -1,4 +1,4 @@
-// 匯率查詢：當天沒有就用「最近的前一天」。台幣永遠是 1。
+// 匯率查詢：當天沒有就用「最近的前一天」；比所有資料都早的話，用最早那天的（不用手填）。台幣永遠是 1。
 
 export function makeFx(rows = []) {
   const byCur = new Map();
@@ -18,7 +18,7 @@ export function makeFx(rows = []) {
       const mid = (lo + hi) >> 1;
       if (list[mid].date <= date) { ans = mid; lo = mid + 1; } else hi = mid - 1;
     }
-    return ans >= 0 ? list[ans] : null;
+    return ans >= 0 ? list[ans] : list[0];
   }
   const rateOn = (currency, date) => lookup(currency, date)?.rate ?? null;
   const latest = (currency) => {

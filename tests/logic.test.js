@@ -183,10 +183,10 @@ describe('分類樹', () => {
 
 describe('匯率', () => {
   const fx = makeFx([{ currency: 'USD', rate_date: '2026-11-20', rate: 32.1 }, { currency: 'USD', rate_date: '2026-11-18', rate: 31.9 }]);
-  test('當天沒有就用最近的前一天；台幣是 1；完全沒有回傳 null', () => {
+  test('當天沒有就用最近的前一天；比資料早就用最早的；台幣是 1；完全沒有資料回傳 null', () => {
     expect(fx.rateOn('USD', '2026-11-19')).toBe(31.9);
     expect(fx.rateOn('USD', '2026-11-23')).toBe(32.1);
-    expect(fx.rateOn('USD', '2026-11-01')).toBeNull();
+    expect(fx.rateOn('USD', '2026-11-01')).toBe(31.9);
     expect(fx.rateOn('TWD', '2026-11-01')).toBe(1);
     expect(fx.latest('USD')).toBe(32.1);
     expect(fx.latest('JPY')).toBeNull();

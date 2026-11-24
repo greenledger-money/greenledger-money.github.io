@@ -13,6 +13,7 @@ const PATHS = {
   chev: 'm9 6 6 6-6 6',
   back: 'm15 6-6 6 6 6',
   down: 'm6 9 6 6 6-6',
+  up: 'm6 15 6-6 6 6',
   x: 'M6 6l12 12M18 6 6 18',
   check: 'm5 12 5 5 9-10',
   list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
@@ -229,4 +230,20 @@ export function downloadText(filename, text, type = 'text/csv;charset=utf-8') {
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+/** 排序模式用的上下移動；list 是同一組的 id，回傳移動後的新順序 */
+export function MoveButtons({ ids, id, onMove, label }) {
+  const i = ids.indexOf(id);
+  const move = (d) => {
+    const next = [...ids];
+    [next[i], next[i + d]] = [next[i + d], next[i]];
+    onMove(next);
+  };
+  return (
+    <span className="row-flex" style={{ gap: 0 }}>
+      <button type="button" className="iconbtn" disabled={i <= 0} onClick={() => move(-1)} aria-label={`${label} 往上移`} style={{ opacity: i <= 0 ? 0.3 : 1 }}><Icon name="up" /></button>
+      <button type="button" className="iconbtn" disabled={i >= ids.length - 1} onClick={() => move(1)} aria-label={`${label} 往下移`} style={{ opacity: i >= ids.length - 1 ? 0.3 : 1 }}><Icon name="down" /></button>
+    </span>
+  );
 }

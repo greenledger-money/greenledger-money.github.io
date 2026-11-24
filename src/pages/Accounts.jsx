@@ -1,7 +1,7 @@
 // 帳戶：依類型分組、餘額（外幣另顯示台幣）、隱藏帳戶、新增／修改；帳戶明細
 import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
-import { Empty, Field, Icon, Item, Money, Page, Section, Seg, Sheet, Toggle, back, go, useAction, useUI } from '../ui/kit.jsx';
+import { Empty, Field, Icon, Item, MoveButtons, Money, Page, Section, Seg, Sheet, Toggle, back, go, useAction, useUI } from '../ui/kit.jsx';
 import { TxnList } from '../ui/TxnList.jsx';
 import { ACCOUNT_TYPES, accountTypeLabel } from '../lib/ledger.js';
 import { CURRENCIES, fmt } from '../lib/money.js';
@@ -58,13 +58,22 @@ export function AccountSheet({ original, onClose }) {
 }
 
 export default function Accounts() {
-  const { data } = useLedger();
+  const { data, actions } = useLedger();
+  const [run] = useAction();
   const [edit, setEdit] = useState(null);
+  const [sorting, setSorting] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
   const visible = data.accounts.filter((a) => !a.hidden);
   const hidden = data.accounts.filter((a) => a.hidden);
-  const row = (a) => {
+  const row = (a, groupIds) => {
     const isBrk = a.type === 'brokerage';
+    if (sorting) {
+      return (
+        <Item key={a.id} title={a.name} sub={accountTypeLabel(a.type)} chevron={false}>
+          <MoveButtons ids={groupIds} id={a.id} label={a.name} onMove={(ids) => run(() => actions.reorder('accounts', ids))} />
+        </Item>
+      );
+    }
     const native = isBrk ? data.stockValue.get(a.id)?.native ?? 0 : data.balances.get(a.id);
     const twd = data.worth.rows.find((r) => r.account.id === a.id)?.twd;
     return (
@@ -72,11 +81,15 @@ export default function Accounts() {
         sub={isBrk ? '股票市值' : data.unsettled.get(a.id) ? `待交割 ${fmt(data.unsettled.get(a.id), a.currency, { sign: true })}` : a.currency !== 'TWD' ? a.currency : null}
         value={<Money value={native} currency={a.currency} className={native < 0 ? 'expense' : ''} />}
         valueSub={a.currency !== 'TWD' && twd != null ? `≈ ${fmt(twd)}` : null}
-        onClick={() => go(isBrk ? 'stocks' : 'account', a.id)} />
+        onClick={() => go('account', a.id)} />
     );
   };
   return (
-    <Page title="帳戶" right={<button className="iconbtn" aria-label="新增帳戶" onClick={() => setEdit({})}><Icon name="plus" /></button>}>
+    <Page title="帳戶" right={<>
+      <button className="link" onClick={() => setSorting(!sorting)}>{sorting ? '完成' : '排序'}</button>
+      {!sorting && <button className="iconbtn" aria-label="新增帳戶" onClick={() => setEdit({})}><Icon name="plus" /></button>}
+    </>}>
+      {sorting && <div className="notice">用 ↑ ↓ 調整同一類帳戶的順序，記帳選帳戶時也會照這個順序。</div>}
       <div className="card hero">
         <div><div className="label">淨資產（含股票市值）</div><div className="big num">{fmt(data.worth.total)}</div></div>
       </div>
@@ -86,13 +99,14 @@ export default function Accounts() {
         const sum = data.worth.rows.filter((r) => r.account.type === t.value).reduce((s, r) => s + r.twd, 0);
         return (
           <Section key={t.value} title={<>{t.label}<span className="num" style={{ marginLeft: 'auto', fontWeight: 400 }}>{fmt(sum)}</span></>}>
-            <div className="list">{list.map(row)}</div>
+            <div className="list">{list.map((a) => row(a, list.map((x) => x.id)))}</div>
           </Section>
         );
       })}
       {hidden.length > 0 && (
-        <Section title={<button className="link" style={{ padding: 0 }} onClick={() => setShowHidden(!showHidden)}>{showHidden ? '收起' : '顯示'}已隱藏的帳戶（{hidden.length}）</button>}>
-          {showHidden && <div className="list">{hidden.map(row)}</div>}
+        <Section title={<button className="btn small" onClick={() => setShowHidden(!showHidden)}>{showHidden ? '收起' : '顯示'}已隱藏的帳戶（{hidden.length}）</button>}>
+          {showHidden && <p className="small muted" style={{ margin: '0 4px 8px' }}>點帳戶 › 編輯 › 關掉「隱藏」就會回到列表。</p>}
+          {(showHidden || sorting) && <div className="list">{hidden.map((a) => row(a, hidden.map((x) => x.id)))}</div>}
         </Section>
       )}
       {edit && <AccountSheet original={edit.id ? edit : null} onClose={() => setEdit(null)} />}
@@ -109,18 +123,21 @@ export function AccountDetail({ id }) {
   const txns = useMemo(() => data.transactions.filter((t) => (t.account_id === id || t.to_account_id === id)
     && (kind === 'all' || (kind === 'future' ? Date.parse(t.occurred_at) > Date.now() : Date.parse(t.occurred_at) <= Date.now()))), [data.transactions, id, kind]);
   if (!a) return <Page title="帳戶" onBack={() => back('accounts')}><Empty>找不到這個帳戶</Empty></Page>;
-  const bal = data.balances.get(id);
+  const isBrk = a.type === 'brokerage';
+  const bal = isBrk ? data.stockValue.get(id)?.native ?? 0 : data.balances.get(id);
   const hasFuture = data.transactions.some((t) => (t.account_id === id || t.to_account_id === id) && Date.parse(t.occurred_at) > Date.now());
   return (
     <Page title={a.name} onBack={() => back('accounts')} right={<button className="link" onClick={() => setEdit(true)}>編輯</button>}>
       <div className="card hero">
         <div>
-          <div className="label">{accountTypeLabel(a.type)}{a.hidden ? '（已隱藏）' : ''} · 目前餘額</div>
+          <div className="label">{accountTypeLabel(a.type)}{a.hidden ? '（已隱藏）' : ''} · {isBrk ? '股票市值' : '目前餘額'}</div>
           <div className={`big num ${bal < 0 ? 'expense' : ''}`}>{fmt(bal, a.currency, { exact: true })}</div>
           {a.currency !== 'TWD' && data.fx.latest(a.currency) && <div className="small muted">≈ {fmt(bal * data.fx.latest(a.currency))}（匯率 {data.fx.latest(a.currency)}）</div>}
-          <div className="small muted">期初 {fmt(a.opening_balance, a.currency)}，餘額每次都從帳本重新計算</div>
+          <div className="small muted">{isBrk ? '證券戶在淨資產裡用股票市值計算' : `期初 ${fmt(a.opening_balance, a.currency)}，餘額每次都從帳本重新計算`}</div>
         </div>
-        <button className="btn primary" onClick={() => openEntry({ initial: { account_id: id, type: 'expense' } })}><Icon name="plus" className="chev" />在這個帳戶記一筆</button>
+        {isBrk
+          ? <button className="btn primary" onClick={() => go('stocks')}><Icon name="stock" className="chev" />看持股</button>
+          : <button className="btn primary" onClick={() => openEntry({ initial: { account_id: id, type: 'expense' } })}><Icon name="plus" className="chev" />在這個帳戶記一筆</button>}
       </div>
       {hasFuture && <Seg value={kind} onChange={setKind} options={[{ value: 'all', label: '全部' }, { value: 'past', label: '已發生' }, { value: 'future', label: '未到（交割）' }]} />}
       <TxnList txns={txns} accountId={id} dayTotals={false} />

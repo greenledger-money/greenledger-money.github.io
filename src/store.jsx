@@ -425,6 +425,14 @@ export function LedgerProvider({ backend, user, children }) {
 
     const deleteDividend = (div) => removeRows('transactions', [div.transaction_id]);
 
+    /** 排序：照 ids 的順序把 sort_order 設成 0, 1, 2…（只寫有變的） */
+    async function reorder(table, ids) {
+      for (let i = 0; i < ids.length; i++) {
+        const r = T()[table].find((x) => x.id === ids[i]);
+        if (r && r.sort_order !== i) await updateRow(table, ids[i], { sort_order: i });
+      }
+    }
+
     async function saveManualPrice({ market, symbol, price_date, close }) {
       return (await insertRows('manual_prices', [{ market, symbol, price_date, close: Number(close) }], { onConflict: 'user_id,market,symbol,price_date' }))[0];
     }
@@ -449,7 +457,7 @@ export function LedgerProvider({ backend, user, children }) {
     return {
       saveTxn, deleteTxn, saveAccount, saveCategory, saveTemplate, useInstantTemplate, saveRecurring,
       confirmRecurring, skipPending, saveTrade, deleteTrade, saveDividend, deleteDividend, saveManualPrice,
-      updateSettings, bulkInsert, insertRows, updateRow, removeRows, reload: load,
+      updateSettings, bulkInsert, insertRows, updateRow, removeRows, reorder, reload: load,
     };
   }, [derived, insertRows, updateRow, removeRows, load]);
 

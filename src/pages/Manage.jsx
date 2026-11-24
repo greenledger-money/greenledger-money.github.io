@@ -1,7 +1,7 @@
 // 「更多」選單，以及範本、固定收支、分類的管理頁
 import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
-import { Empty, Field, Icon, Item, Money, Page, Section, Seg, Sheet, Toggle, back, go, useAction, useUI } from '../ui/kit.jsx';
+import { Empty, Field, Group, Icon, Item, MoveButtons, Money, Page, Section, Seg, Sheet, Toggle, back, go, useAction, useUI } from '../ui/kit.jsx';
 import { AccountSelect, CategoryButton } from '../ui/pickers.jsx';
 import { parentOptions, validateCategory } from '../lib/categories.js';
 import { describe, nextDate, UNIT_LABEL } from '../lib/recurring.js';
@@ -79,14 +79,28 @@ function TemplateSheet({ original, onClose }) {
 }
 
 export function Templates() {
-  const { data } = useLedger();
+  const { data, actions } = useLedger();
+  const [run] = useAction();
   const [edit, setEdit] = useState(null);
+  const [sorting, setSorting] = useState(false);
+  const list = [...data.templates].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name, 'zh-Hant'));
+  const ids = list.map((t) => t.id);
   return (
-    <Page title="範本" onBack={() => back('more')} right={<button className="iconbtn" aria-label="新增範本" onClick={() => setEdit({})}><Icon name="plus" /></button>}>
+    <Page title="範本" onBack={() => back('more')} right={<>
+      {list.length > 1 && <button className="link" onClick={() => setSorting(!sorting)}>{sorting ? '完成' : '排序'}</button>}
+      {!sorting && <button className="iconbtn" aria-label="新增範本" onClick={() => setEdit({})}><Icon name="plus" /></button>}
+    </>}>
       <p className="small muted" style={{ margin: 0 }}>首頁會顯示範本按鈕。「帶入表單」會打開記帳表單讓你改；「一鍵直接記」按了就記好（要有固定金額）。</p>
       <div className="list">
-        {data.templates.length ? data.templates.map((t) => {
+        {list.length ? list.map((t) => {
           const acc = data.accById.get(t.account_id);
+          if (sorting) {
+            return (
+              <Item key={t.id} title={t.name} chevron={false}>
+                <MoveButtons ids={ids} id={t.id} label={t.name} onMove={(next) => run(() => actions.reorder('templates', next))} />
+              </Item>
+            );
+          }
           return (
             <Item key={t.id} onClick={() => setEdit(t)} title={<>{t.mode === 'instant' && <span className="badge accent">一鍵</span>} {t.name}</>}
               sub={[TXN_LABEL[t.type], t.category_id && data.tree.path(t.category_id), acc?.name].filter(Boolean).join(' · ')}
@@ -223,7 +237,9 @@ function CategorySheet({ original, kind, parentId, onClose }) {
 }
 
 export function Categories() {
-  const { data } = useLedger();
+  const { data, actions } = useLedger();
+  const [run] = useAction();
+  const [sorting, setSorting] = useState(false);
   const [kind, setKind] = useState('expense');
   const [edit, setEdit] = useState(null);
   const [showArchived, setShowArchived] = useState(false);
@@ -240,11 +256,21 @@ export function Categories() {
   };
   data.tree.roots[kind].forEach((r) => walk(r, 0));
   return (
-    <Page title="分類" onBack={() => back('more')} right={<button className="iconbtn" aria-label="新增分類" onClick={() => setEdit({ kind })}><Icon name="plus" /></button>}>
+    <Page title="分類" onBack={() => back('more')} right={<>
+      <button className="link" onClick={() => setSorting(!sorting)}>{sorting ? '完成' : '排序'}</button>
+      {!sorting && <button className="iconbtn" aria-label="新增分類" onClick={() => setEdit({ kind })}><Icon name="plus" /></button>}
+    </>}>
       <Seg value={kind} onChange={setKind} options={[{ value: 'expense', label: '支出' }, { value: 'income', label: '收入' }]} />
-      <p className="small muted" style={{ margin: 0 }}>點分類可以改名、搬移、封存；按 ＋ 在它底下新增子分類（最多三層）。</p>
+      <p className="small muted" style={{ margin: 0 }}>{sorting ? '用 ↑ ↓ 調整同一層分類的順序，記帳選分類時也會照這個順序。' : '點分類可以改名、搬移、封存；按 ＋ 在它底下新增子分類（最多三層）。'}</p>
       <div className="list">
-        {rows.map(({ n, depth }) => (
+        {rows.map(({ n, depth }) => (sorting ? (
+          <div key={n.id} className={`item indent-${depth}`} style={{ paddingTop: 0, paddingBottom: 0 }}>
+            <div className="main"><div className="title">{n.name}</div></div>
+            <MoveButtons label={n.name} id={n.id}
+              ids={(n.parent_id ? data.tree.byId.get(n.parent_id).children : data.tree.roots[kind]).filter((c) => showArchived || !c.archived).map((c) => c.id)}
+              onMove={(ids) => run(() => actions.reorder('categories', ids))} />
+          </div>
+        ) : (
           <div key={n.id} className={`item indent-${depth}`} style={{ paddingTop: 0, paddingBottom: 0 }}>
             <button className="item" style={{ padding: '10px 0', flex: 1 }} onClick={() => setEdit({ original: n })}>
               <div className="main">
@@ -255,7 +281,7 @@ export function Categories() {
             {depth < 2 ? <button className="iconbtn" style={{ width: 40, height: 40, color: 'var(--muted)' }} onClick={() => setEdit({ kind, parentId: n.id })} aria-label={`在「${n.name}」底下新增子分類`} title="新增子分類"><Icon name="plus" /></button>
               : <span style={{ width: 40 }} />}
           </div>
-        ))}
+        )))}
       </div>
       <label className="row-flex small"><span className="grow">顯示已封存的分類</span><Toggle label="顯示已封存" checked={showArchived} onChange={setShowArchived} /></label>
       {edit && <CategorySheet original={edit.original} kind={edit.kind ?? kind} parentId={edit.parentId} onClose={() => setEdit(null)} />}
