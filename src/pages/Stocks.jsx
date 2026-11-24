@@ -4,7 +4,7 @@ import { useLedger } from '../store.jsx';
 import { Empty, Field, Icon, Item, Page, Section, Seg, Sheet, back, go, useAction, useUI } from '../ui/kit.jsx';
 import { Donut } from '../ui/charts.jsx';
 import { AccountSelect } from '../ui/pickers.jsx';
-import { allocation, defaultSettleDate, estimateNhi, estimateTwFee, estimateTwTax, guessKind, tradeNetAmount } from '../lib/stocks.js';
+import { allocation, currencyOfMarket, defaultSettleDate, estimateNhi, estimateTwFee, estimateTwTax, guessKind, marketOfAccount, tradeNetAmount } from '../lib/stocks.js';
 import { fmt, pct, round2, shares as fmtShares } from '../lib/money.js';
 import { dayLabel, todayStr } from '../lib/dates.js';
 
@@ -27,12 +27,12 @@ export function TradeSheet({ original, initial = {}, onClose }) {
   const firstBrk = src.brokerage_account_id ?? brokerages[0]?.id ?? null;
   const brk0 = data.accById.get(firstBrk);
   const st = data.settings;
-  const market0 = src.market ?? (brk0?.currency === 'USD' ? 'US' : 'TW');
+  const market0 = src.market ?? marketOfAccount(brk0);
   const [f, setF] = useState({
     side: src.side ?? 'buy', brokerage_account_id: firstBrk, market: market0,
     symbol: src.symbol ?? '', name: src.name ?? '', kind: src.kind ?? 'stock', trade_date: src.trade_date ?? todayStr(),
     settle_date: src.settle_date ?? '', shares: src.shares != null ? String(src.shares) : '', price: src.price != null ? String(src.price) : '',
-    fee: src.fee != null ? String(src.fee) : '', tax: src.tax != null ? String(src.tax) : '', currency: src.currency ?? brk0?.currency ?? 'TWD',
+    fee: src.fee != null ? String(src.fee) : '', tax: src.tax != null ? String(src.tax) : '',
     settlement_account_id: src.settlement_account_id ?? (market0 === 'US' ? st.settlementUS : st.settlementTW)
       ?? data.stock_trades.findLast?.((t) => t.settlement_account_id && t.market === market0)?.settlement_account_id ?? null,
     settle_amount: src.settle_amount != null ? String(src.settle_amount) : '', order_no: src.order_no ?? '', note: src.note ?? '',
@@ -55,11 +55,12 @@ export function TradeSheet({ original, initial = {}, onClose }) {
   };
   const settleAcc = data.accById.get(f.settlement_account_id);
   const net = gross > 0 ? tradeNetAmount({ ...view, shares: Number(f.shares), price: Number(f.price) }) : 0;
-  const cross = settleAcc && settleAcc.currency !== f.currency;
+  const currency = currencyOfMarket(f.market); // 美股一律美金計價，台幣交割時用交割金額或匯率換算
+  const cross = settleAcc && settleAcc.currency !== currency;
 
   function changeBrokerage(id) {
     const a = data.accById.get(id);
-    setF((x) => ({ ...x, brokerage_account_id: id, currency: a?.currency ?? x.currency, market: a?.currency === 'USD' ? 'US' : a?.currency === 'TWD' ? 'TW' : x.market }));
+    setF((x) => ({ ...x, brokerage_account_id: id, market: marketOfAccount(a) }));
   }
 
   async function save() {
@@ -73,7 +74,7 @@ export function TradeSheet({ original, initial = {}, onClose }) {
       const held = (pos?.shares ?? 0) + (original?.side === 'sell' ? Number(original.shares) : 0);
       if (Number(f.shares) > held + 1e-9 && !(await confirm(`目前只有 ${fmtShares(held)} 股，確定要賣 ${f.shares} 股？`))) return;
     }
-    const ok = await run(() => actions.saveTrade({ ...view, symbol: sym, pending_item_id: initial.pending_item_id }, original), original ? '已更新' : '已記錄成交');
+    const ok = await run(() => actions.saveTrade({ ...view, currency, symbol: sym, pending_item_id: initial.pending_item_id }, original), original ? '已更新' : '已記錄成交');
     if (ok) onClose();
   }
   async function remove() {
@@ -107,7 +108,7 @@ export function TradeSheet({ original, initial = {}, onClose }) {
         </div>
         <div className="grid2">
           <Field label="股數" hint={f.market === 'TW' ? '一張＝1000 股' : ''}><input className="input num" inputMode="decimal" value={f.shares} onChange={set('shares')} /></Field>
-          <Field label={f.side === 'opening' ? `均價（${f.currency}）` : `成交價（${f.currency}）`}><input className="input num" inputMode="decimal" value={f.price} onChange={set('price')} /></Field>
+          <Field label={f.side === 'opening' ? `均價（${currency}）` : `成交價（${currency}）`}><input className="input num" inputMode="decimal" value={f.price} onChange={set('price')} /></Field>
         </div>
         {f.side !== 'opening' && (
           <>
@@ -117,12 +118,12 @@ export function TradeSheet({ original, initial = {}, onClose }) {
             </div>
             <Field label="交割戶"><AccountSelect value={f.settlement_account_id} onChange={set('settlement_account_id')} filter={(a) => a.type === 'bank'} placeholder="選擇交割戶" /></Field>
             {cross && (
-              <Field label={`交割金額（${settleAcc.currency}）`} hint="留空用匯率換算">
+              <Field label={`實際${f.side === 'buy' ? '扣款' : '入帳'}（${settleAcc.currency}）`} hint="照對帳單填；留空用匯率換算">
                 <input className="input num" inputMode="decimal" value={f.settle_amount} onChange={set('settle_amount')} />
               </Field>
             )}
             <div className="notice">
-              {f.side === 'buy' ? '交割日從交割戶扣款' : '交割日入帳到交割戶'} <b className="num">{fmt(net, f.currency)}</b>
+              {f.side === 'buy' ? '交割日從交割戶扣款' : '交割日入帳到交割戶'} <b className="num">{fmt(net, currency)}</b>{cross ? `（${settleAcc.currency} 交割）` : ''}
               （{f.side === 'buy' ? '價金＋手續費' : '價金－手續費－稅'}）。這是轉帳，不算進月收支。
             </div>
             <Field label="委託書號" hint="選填，防止重複"><input className="input" value={f.order_no} onChange={set('order_no')} /></Field>
@@ -148,13 +149,14 @@ export function DividendSheet({ original, initial = {}, onClose }) {
   const src = original ?? initial;
   const brk = data.accById.get(src.brokerage_account_id ?? brokerages[0]?.id);
   const [f, setF] = useState({
-    brokerage_account_id: brk?.id ?? null, market: src.market ?? (brk?.currency === 'USD' ? 'US' : 'TW'), symbol: src.symbol ?? '',
+    brokerage_account_id: brk?.id ?? null, market: src.market ?? marketOfAccount(brk), symbol: src.symbol ?? '',
     pay_date: src.pay_date ?? todayStr(), gross: src.gross != null ? String(src.gross) : '', withholding: src.withholding != null ? String(src.withholding) : '',
-    nhi_premium: src.nhi_premium != null ? String(src.nhi_premium) : '', currency: src.currency ?? brk?.currency ?? 'TWD',
+    nhi_premium: src.nhi_premium != null ? String(src.nhi_premium) : '',
     deposit_account_id: txn?.account_id ?? null, note: src.note ?? '',
   });
   const [err, setErr] = useState('');
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e?.target ? e.target.value : e }));
+  const divCur = currencyOfMarket(f.market);
   const gross = Number(f.gross) || 0;
   const wh = f.withholding === '' ? (f.market === 'US' ? round2(gross * data.settings.usWithholding) : 0) : Number(f.withholding);
   const nhi = f.nhi_premium === '' ? (f.market === 'TW' ? estimateNhi(gross) : 0) : Number(f.nhi_premium);
@@ -165,7 +167,7 @@ export function DividendSheet({ original, initial = {}, onClose }) {
     if (!f.symbol.trim()) return setErr('請輸入代號');
     if (!(gross > 0)) return setErr('請輸入股利總額');
     if (!f.deposit_account_id) return setErr('請選擇入帳帳戶');
-    const ok = await run(() => actions.saveDividend({ ...f, withholding: wh, nhi_premium: nhi }, original), original ? '已更新' : '已記錄股利');
+    const ok = await run(() => actions.saveDividend({ ...f, currency: divCur, withholding: wh, nhi_premium: nhi }, original), original ? '已更新' : '已記錄股利');
     if (ok) onClose();
   }
   async function remove() {
@@ -176,7 +178,7 @@ export function DividendSheet({ original, initial = {}, onClose }) {
     <Sheet title={original ? '修改股利' : '記錄股利'} onClose={onClose} onSave={save} saving={busy}>
       <div className="form">
         <Field label="證券戶">
-          <select className="input" value={f.brokerage_account_id ?? ''} onChange={(e) => { const a = data.accById.get(e.target.value); setF((x) => ({ ...x, brokerage_account_id: a.id, currency: a.currency, market: a.currency === 'USD' ? 'US' : 'TW' })); }}>
+          <select className="input" value={f.brokerage_account_id ?? ''} onChange={(e) => { const a = data.accById.get(e.target.value); setF((x) => ({ ...x, brokerage_account_id: a.id, market: marketOfAccount(a) })); }}>
             {brokerages.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         </Field>
@@ -187,13 +189,13 @@ export function DividendSheet({ original, initial = {}, onClose }) {
           </Field>
           <Field label="發放日"><input className="input" type="date" value={f.pay_date} onChange={set('pay_date')} /></Field>
         </div>
-        <Field label={`股利總額（${f.currency}）`}><input className="input num" inputMode="decimal" value={f.gross} onChange={set('gross')} /></Field>
+        <Field label={`股利總額（${divCur}）`}><input className="input num" inputMode="decimal" value={f.gross} onChange={set('gross')} /></Field>
         <div className="grid2">
           <Field label="預扣稅" hint={f.market === 'US' && f.withholding === '' ? `預設 ${Math.round(data.settings.usWithholding * 100)}%` : ''}><input className="input num" inputMode="decimal" value={f.withholding} placeholder={String(wh)} onChange={set('withholding')} /></Field>
           <Field label="二代健保" hint={f.market === 'TW' && f.nhi_premium === '' ? '滿 2 萬扣 2.11%' : ''}><input className="input num" inputMode="decimal" value={f.nhi_premium} placeholder={String(nhi)} onChange={set('nhi_premium')} /></Field>
         </div>
         <Field label="入帳帳戶"><AccountSelect value={f.deposit_account_id} onChange={set('deposit_account_id')} filter={(a) => a.type !== 'brokerage'} /></Field>
-        <div className="notice">實拿 <b className="num">{fmt(gross - wh - nhi, f.currency)}</b>，記成收入「投資收入-股利」。</div>
+        <div className="notice">實拿 <b className="num">{fmt(gross - wh - nhi, divCur)}</b>，記成收入「投資收入-股利」（入帳帳戶是別的幣別時用匯率換算）。</div>
         <Field label="備註"><input className="input" value={f.note} onChange={set('note')} /></Field>
         {err && <div className="error">{err}</div>}
         {original && <button className="btn danger block" onClick={remove} disabled={busy}>刪除這筆股利</button>}
@@ -272,8 +274,9 @@ export default function Stocks() {
           <div className="list">
             {brokerages.map((b) => {
               const list = rows.filter((r) => r.accountId === b.id);
-              const mv = list.reduce((x, r) => x + r.marketValue, 0);
-              const cost = list.reduce((x, r) => x + r.cost, 0);
+              const rate = b.currency === 'TWD' ? 1 : data.fx.latest(b.currency) || 1;
+              const mv = list.reduce((x, r) => x + r.marketValueTwd, 0) / rate;
+              const cost = list.reduce((x, r) => x + r.costTwd, 0) / rate;
               return (
                 <Item key={b.id} onClick={() => go('account', b.id)} title={b.name}
                   sub={`持股 ${list.length} 檔${b.currency !== 'TWD' ? ` · ${b.currency}` : ''}`}
@@ -323,7 +326,7 @@ export function StockDetail({ id }) {
   if (!pos || pos.shares <= 1e-9) return <Page title={symbol} onBack={() => back('stocks')}><Empty>這檔已經全部賣掉了，獲益到「報表」查。</Empty></Page>;
   const trades = [...pos.trades].sort((a, b) => b.trade_date.localeCompare(a.trade_date));
   const divs = data.dividends.filter((dv) => dv.symbol === symbol && dv.brokerage_account_id === accountId).sort((a, b) => b.pay_date.localeCompare(a.pay_date));
-  const cur = pos.currency;
+  const cur = currencyOfMarket(market);
   return (
     <Page title={`${symbol} ${pos.name || data.priceBook.name(market, symbol)}`} onBack={() => back('account', accountId)}>
       <div className="card hero">
@@ -381,12 +384,14 @@ export function BrokerageView({ account }) {
   const [sheet, setSheet] = useState(null);
   const cur = account.currency;
   const rows = data.holdings.filter((r) => r.accountId === account.id);
-  const mv = rows.reduce((x, r) => x + r.marketValue, 0);
-  const cost = rows.reduce((x, r) => x + r.cost, 0);
+  // 合計換成證券戶的幣別（例如台幣交割的美股戶：每檔看美金，合計看台幣）
+  const rate = cur === 'TWD' ? 1 : data.fx.latest(cur) || 1;
+  const mv = rows.reduce((x, r) => x + r.marketValueTwd, 0) / rate;
+  const cost = rows.reduce((x, r) => x + r.costTwd, 0) / rate;
   const pnl = mv - cost;
   const twd = rows.reduce((x, r) => x + r.marketValueTwd, 0);
   const last = rows.map((r) => r.priceDate).filter(Boolean).sort().pop();
-  const market = cur === 'USD' ? 'US' : 'TW';
+  const market = marketOfAccount(account);
   const noPrice = rows.filter((r) => r.priceSource === 'cost');
   return (
     <>
@@ -394,7 +399,7 @@ export function BrokerageView({ account }) {
         <div className="big num">{fmt(mv, cur, { exact: true })}</div>
         <div className={`num ${pnlCls(pnl)}`} style={{ fontSize: 18, fontWeight: 600 }}>{fmt(pnl, cur, { sign: true, exact: true })}</div>
         <div className={`num small ${pnlCls(pnl)}`}>（{cost ? pct(pnl / cost) : '—'}）</div>
-        <div className="small muted">股票總市值{cur !== 'TWD' ? ` ≈ ${fmt(twd)}` : ''}</div>
+        <div className="small muted">股票總市值{cur !== 'TWD' ? ` ≈ ${fmt(twd)}` : ''}{rows.some((r) => r.currency !== cur) ? `（外幣持股換成 ${cur}）` : ''}</div>
         <div className="stats" style={{ borderTop: '1px solid var(--line)', marginTop: 12, paddingTop: 12 }}>
           <div><b className="num">{fmt(cost, cur)}</b><span className="small muted">股票成本</span></div>
           <div><b className="num">{rows.length}</b><span className="small muted">持股檔數</span></div>
@@ -402,8 +407,8 @@ export function BrokerageView({ account }) {
         </div>
       </div>
       <div className="chips">
-        <button className="chip" onClick={() => openTrade({ initial: { side: 'buy', brokerage_account_id: account.id, market, currency: cur } })}>＋ 買進／賣出</button>
-        <button className="chip" onClick={() => openTrade({ initial: { side: 'opening', brokerage_account_id: account.id, market, currency: cur } })}>＋ 期初持股</button>
+        <button className="chip" onClick={() => openTrade({ initial: { side: 'buy', brokerage_account_id: account.id, market } })}>＋ 買進／賣出</button>
+        <button className="chip" onClick={() => openTrade({ initial: { side: 'opening', brokerage_account_id: account.id, market } })}>＋ 期初持股</button>
         <button className="chip" onClick={() => setSheet({ kind: 'div' })}>＋ 股利</button>
         <button className="chip" onClick={() => setSheet({ kind: 'price' })}>手動股價</button>
       </div>
@@ -428,7 +433,7 @@ export function BrokerageView({ account }) {
         </div>
       </Section>
       {last && <p className="small muted right" style={{ margin: 0 }}>股價日期：{last}</p>}
-      {sheet?.kind === 'div' && <DividendSheet initial={{ brokerage_account_id: account.id, market, currency: cur }} onClose={() => setSheet(null)} />}
+      {sheet?.kind === 'div' && <DividendSheet initial={{ brokerage_account_id: account.id, market }} onClose={() => setSheet(null)} />}
       {sheet?.kind === 'price' && <PriceSheet market={market} onClose={() => setSheet(null)} />}
     </>
   );

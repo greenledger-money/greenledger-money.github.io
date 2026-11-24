@@ -273,6 +273,16 @@ describe('已實現損益記進月收支（CW 記法）', () => {
     expect(after.find((t) => t.id === 'st').amount).toBe(65071);
     expect(computeBalances([{ id: 'bank', opening_balance: 0 }], after, null).get('bank')).toBe(59735);
   });
+  test('美股＋台幣證券戶＋台幣交割：轉帳兩邊都記台幣成本，獲利換成台幣記在交割戶', () => {
+    const us = { brokerage_account_id: 'ntd', market: 'US', symbol: 'SOXX', name: '', kind: 'etf', currency: 'USD', tax: 0, fee: 0 };
+    const b1 = { ...us, id: 'x1', side: 'opening', trade_date: '2026-01-02', shares: 10, price: 200 };
+    // 賣 10 股 @250 → 拿回 US$2,500，對帳單入帳 NT$80,000（匯率 32）；成本 US$2,000 → 賺 US$500 ＝ NT$16,000
+    const s1 = { ...us, id: 'x2', side: 'sell', trade_date: '2026-06-01', settle_date: '2026-06-03', shares: 10, price: 250, settlement_account_id: 'bank', settle_amount: 80000, settlement_txn_id: 'st2' };
+    const st2 = { id: 'st2', type: 'transfer', account_id: 'ntd', amount: 80000, fx_rate: 1, to_account_id: 'bank', to_amount: 80000, to_fx_rate: 1, occurred_at: new Date('2026-06-03T00:00:00').toISOString() };
+    const plan = realizedTxnPlan({ trades: [b1, s1], txns: [st2], ...ctx, accountCurrency: (id) => ({ ntd: 'TWD', bank: 'TWD' }[id]) });
+    expect(plan.update).toEqual([{ id: 'st2', patch: { amount: 64000, to_amount: 64000 } }]);
+    expect(plan.insert[0]).toMatchObject({ type: 'income', amount: 16000, account_id: 'bank', fx_rate: 1 });
+  });
   test('剛好打平就刪掉損益那筆、轉帳回到全額；沒有交割戶就記在證券戶；美股用匯率', () => {
     const p1 = realizedTxnPlan({ trades: [buy, sell], txns: [settleTx], ...ctx });
     const txns = apply([settleTx], p1);

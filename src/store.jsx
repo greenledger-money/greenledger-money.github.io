@@ -126,7 +126,8 @@ export function LedgerProvider({ backend, user, children }) {
     const t = tablesRef.current;
     const key = (k) => t.categories.find((c) => c.system_key === k)?.id;
     const fx = makeFx(sharedRef.current.fx_rates);
-    const plan = realizedTxnPlan({ trades: t.stock_trades, txns: t.transactions, gainCatId: key('stock_gain'), lossCatId: key('stock_loss'), rateFor: fx.rateOn });
+    const curOf = (id) => t.accounts.find((a) => a.id === id)?.currency;
+    const plan = realizedTxnPlan({ trades: t.stock_trades, txns: t.transactions, gainCatId: key('stock_gain'), lossCatId: key('stock_loss'), rateFor: fx.rateOn, accountCurrency: curOf });
     if (plan.insert.length) await insertRows('transactions', plan.insert);
     for (const u of plan.update) await updateRow('transactions', u.id, u.patch);
     for (const l of plan.link) await updateRow('stock_trades', l.tradeId, { pnl_txn_id: l.txnId });
@@ -173,6 +174,12 @@ export function LedgerProvider({ backend, user, children }) {
     const positions = runFifo(tables.stock_trades);
     const holdings = valuePositions(positions, priceBook, fx);
     const stockValue = stockValueByAccount(holdings);
+    // 證券戶市值換成證券戶的幣別（台幣交割的美股戶顯示台幣）
+    for (const [id, v] of stockValue) {
+      const acc = accById.get(id);
+      const rate = !acc || acc.currency === 'TWD' ? 1 : fx.latest(acc.currency);
+      if (rate) v.native = Math.round((v.twd / rate) * 100) / 100;
+    }
     // 股票成交日就算進持股，交割款要到交割日才扣；淨資產先把「已成交、待交割」的款項算進去，避免重複計算
     const today = todayStr();
     const tradeDateOf = new Map(tables.stock_trades.flatMap((t) => [[t.settlement_txn_id, t.trade_date], [t.pnl_txn_id, t.trade_date]]).filter(([id]) => id));
@@ -354,15 +361,22 @@ export function LedgerProvider({ backend, user, children }) {
         const net = tradeNetAmount(trade);
         const settleAcc = d.accById.get(trade.settlement_account_id);
         const date = trade.settle_date || trade.trade_date;
-        const tradeRate = d.rateFor(trade.currency, date) ?? Number(form.trade_rate);
-        const settleRate = d.rateFor(settleAcc.currency, date) ?? Number(form.settle_rate);
-        if (!tradeRate || !settleRate) throw new Error('找不到匯率，請手動填交割金額與匯率');
-        const settleAmount = settleAcc.currency === trade.currency ? net : round2(Number(form.settle_amount) || net * tradeRate / settleRate);
+        const settleRate = settleAcc.currency === 'TWD' ? 1 : d.rateFor(settleAcc.currency, date);
+        const typed = Number(form.settle_amount) || 0; // 對帳單上實際扣／入的金額（交割戶幣別）
+        const tradeRate = trade.currency === 'TWD' ? 1
+          : d.rateFor(trade.currency, date) ?? (typed && settleRate && net ? (typed * settleRate) / net : null);
+        if (!tradeRate || !settleRate) throw new Error(`找不到 ${trade.currency} 匯率，請填實際扣款／入帳金額`);
+        const settleAmount = settleAcc.currency === trade.currency ? net : round2(typed || net * tradeRate / settleRate);
+        // 證券戶那一邊用證券戶的幣別記（台幣證券戶裡的美股 → 記台幣）
+        const brkAcc = d.accById.get(trade.brokerage_account_id);
+        const brkSame = brkAcc.currency === trade.currency;
+        const brkRate = brkSame ? tradeRate : brkAcc.currency === settleAcc.currency ? settleRate : (d.rateFor(brkAcc.currency, date) ?? tradeRate);
+        const brkAmount = brkSame ? net : brkAcc.currency === settleAcc.currency ? settleAmount : round2(net * tradeRate / brkRate);
         trade.settle_amount = settleAmount;
         const label = `${trade.side === 'buy' ? '買進' : '賣出'} ${trade.symbol}${trade.name ? ` ${trade.name}` : ''} ${trade.shares} 股`;
         txn = trade.side === 'buy'
-          ? { account_id: settleAcc.id, amount: settleAmount, fx_rate: settleRate, to_account_id: trade.brokerage_account_id, to_amount: net, to_fx_rate: tradeRate }
-          : { account_id: trade.brokerage_account_id, amount: net, fx_rate: tradeRate, to_account_id: settleAcc.id, to_amount: settleAmount, to_fx_rate: settleRate };
+          ? { account_id: settleAcc.id, amount: settleAmount, fx_rate: settleRate, to_account_id: trade.brokerage_account_id, to_amount: brkAmount, to_fx_rate: brkRate }
+          : { account_id: trade.brokerage_account_id, amount: brkAmount, fx_rate: brkRate, to_account_id: settleAcc.id, to_amount: settleAmount, to_fx_rate: settleRate };
         Object.assign(txn, { type: 'transfer', category_id: null, occurred_at: startOfDayIso(date), note: label, source: 'stock', is_exception: false });
       }
       if (!original) {

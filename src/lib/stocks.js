@@ -159,6 +159,11 @@ export function estimateTwTax(amount, kind = 'stock') {
 /** 預設交割日：T+N 個工作天（台股 T+2） */
 export const defaultSettleDate = (tradeDate, days = 2) => addBusinessDays(tradeDate, days);
 
+/** 證券戶預設的市場：名字有「美股／複委託／US」或帳戶是美金 → 美股；其他台股 */
+export const marketOfAccount = (a) => (a && (/美股|複委託|US/i.test(a.name) || a.currency === 'USD') ? 'US' : 'TW');
+/** 股票本身的幣別看市場（美股＝美金），跟交割戶、證券戶是哪個幣別無關 */
+export const currencyOfMarket = (m) => (m === 'US' ? 'USD' : 'TWD');
+
 /** 台股代號 00 開頭大多是 ETF */
 export const guessKind = (market, symbol) => (market === 'TW' && /^00/.test(symbol) ? 'etf' : 'stock');
 
@@ -178,7 +183,7 @@ export const estimateNhi = (gross) => (gross >= 20000 ? Math.round(gross * 0.021
  * 每次都用 FIFO 從頭重算，跟現有交易比對，回傳要新增／修改／刪除哪些 → 改了以前的買賣，損益和轉帳金額都會自動更新。
  * 沒有交割戶的賣出（例如手動記、沒選交割戶），損益記在證券戶、日期用成交日。
  */
-export function realizedTxnPlan({ trades, txns, gainCatId, lossCatId, rateFor }) {
+export function realizedTxnPlan({ trades, txns, gainCatId, lossCatId, rateFor, accountCurrency = () => null }) {
   const plan = { insert: [], update: [], remove: [], link: [] };
   if (!gainCatId || !lossCatId) return plan;
   const realized = new Map();
@@ -211,7 +216,13 @@ export function realizedTxnPlan({ trades, txns, gainCatId, lossCatId, rateFor })
 
     // 1. 交割轉帳＝成本（拿回的錢扣掉損益）
     if (settleTx) {
-      const want = { amount: round2(net - pnl), to_amount: round2(settleAmount - pnlSettle) };
+      // 證券戶那邊的金額用證券戶幣別：跟成交同幣別＝成本；跟交割戶同幣別＝交割金額扣掉損益；都不同就用匯率換
+      const brkCur = accountCurrency(s.brokerage_account_id) ?? s.currency;
+      const settleCur = accountCurrency(settleAcc) ?? s.currency;
+      const brkCost = brkCur === s.currency ? round2(net - pnl)
+        : brkCur === settleCur ? round2(settleAmount - pnlSettle)
+          : round2(((net - pnl) * tradeRate) / (Number(settleTx.fx_rate) || 1));
+      const want = { amount: brkCost, to_amount: round2(settleAmount - pnlSettle) };
       if (want.amount >= 0 && want.to_amount >= 0 && differs(settleTx, want)) plan.update.push({ id: settleTx.id, patch: want });
     }
 
