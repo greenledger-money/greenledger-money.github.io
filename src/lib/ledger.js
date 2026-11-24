@@ -12,6 +12,7 @@ export const ACCOUNT_TYPES = [
   { value: 'brokerage', label: '證券戶' },
   { value: 'friends_owe', label: '朋友欠我' },
   { value: 'loan', label: '借貸' },
+  { value: 'other', label: '其他' },
 ];
 export const accountTypeLabel = (v) => ACCOUNT_TYPES.find((t) => t.value === v)?.label ?? v;
 export const TXN_LABEL = { expense: '支出', income: '收入', transfer: '轉帳' };

@@ -12,7 +12,7 @@
 -- =====================================================================
 
 -- ---------- 列舉型別 ----------
-create type public.account_type  as enum ('cash','bank','credit_card','e_payment','brokerage','friends_owe','loan');
+create type public.account_type  as enum ('cash','bank','credit_card','e_payment','brokerage','friends_owe','loan','other');
 create type public.category_kind as enum ('expense','income');
 create type public.txn_type      as enum ('expense','income','transfer');
 create type public.template_mode as enum ('fill','instant');
