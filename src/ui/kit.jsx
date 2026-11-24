@@ -100,14 +100,40 @@ function readHash() {
   const [name, ...rest] = h.split('/');
   return { name, arg: rest.length ? decodeURIComponent(rest.join('/')) : null };
 }
+// 捲動位置自己管：iPhone Safari 返回時自己還原捲動，跟我們的「回到頂端」打架會卡住
+if (typeof history !== 'undefined' && 'scrollRestoration' in history) history.scrollRestoration = 'manual';
+const scrollPos = new Map();   // 每個頁面離開時捲到哪
+const visited = [];             // 走過的頁面，用來判斷是不是「返回」
 export function useRoute() {
   const [route, setRoute] = useState(readHash);
   useEffect(() => {
-    const on = () => { setRoute(readHash()); window.scrollTo(0, 0); };
+    let cur = location.hash;
+    visited.push(cur);
+    const onScroll = () => { scrollPos.set(cur, window.scrollY); };
+    const on = () => {
+      const next = location.hash;
+      const isBack = visited.length >= 2 && visited[visited.length - 2] === next;
+      if (isBack) visited.pop(); else visited.push(next);
+      cur = next;
+      setRoute(readHash());
+      unlockIfNoSheet();
+      const y = isBack ? scrollPos.get(next) ?? 0 : 0;
+      // 等新頁面畫好再捲
+      requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, y)));
+    };
     addEventListener('hashchange', on);
-    return () => removeEventListener('hashchange', on);
+    addEventListener('scroll', onScroll, { passive: true });
+    return () => { removeEventListener('hashchange', on); removeEventListener('scroll', onScroll); };
   }, []);
   return route;
+}
+
+// 開視窗時鎖住後面的頁面捲動；用計數，多層視窗一起開關也不會留下鎖
+let locks = 0;
+function lockScroll() { locks += 1; document.body.style.overflow = 'hidden'; }
+function unlockScroll() { locks = Math.max(0, locks - 1); if (!locks) document.body.style.overflow = ''; }
+function unlockIfNoSheet() {
+  setTimeout(() => { if (!document.querySelector('.sheet')) { locks = 0; document.body.style.overflow = ''; } }, 50);
 }
 export const go = (name, arg) => { location.hash = arg ? `${name}/${encodeURIComponent(arg)}` : name; };
 export const back = (fallback = 'home') => { if (history.length > 1) history.back(); else go(fallback); };
@@ -200,13 +226,14 @@ export function Field({ label, hint, children }) {
 
 // ---------- 底部面板 ----------
 export function Sheet({ title, onClose, onSave, saveLabel = '儲存', saving, full, children }) {
+  useEffect(() => { lockScroll(); return unlockScroll; }, []);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e) => { if (e.key === 'Escape') closeRef.current(); };
     addEventListener('keydown', onKey);
-    return () => { document.body.style.overflow = prev; removeEventListener('keydown', onKey); };
-  }, [onClose]);
+    return () => removeEventListener('keydown', onKey);
+  }, []);
   // 用 portal 放到最外層：從記帳畫面裡再開的視窗（例如選分類）不會沿用外面欄位的樣式
   return createPortal(
     <div className="sheet-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
