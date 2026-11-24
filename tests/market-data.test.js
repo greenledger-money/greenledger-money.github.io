@@ -1,6 +1,6 @@
 // 每日更新腳本的解析器（用固定樣本測，不連網路）
 import { describe, expect, test } from 'bun:test';
-import { parseBotCsv, parseTwDate, parseTwPrices, taipeiToday } from '../scripts/update-market-data.mjs';
+import { parseBotCsv, parseErApi, parseTwDate, parseTwPrices, taipeiToday } from '../scripts/update-market-data.mjs';
 
 describe('股價、匯率解析', () => {
   test('民國／西元日期', () => {
@@ -22,6 +22,14 @@ describe('股價、匯率解析', () => {
       { market: 'TW', symbol: '2330', price_date: '2026-11-24', close: 1085, name: '台積電' },
       { market: 'TW', symbol: '6488', price_date: '2026-11-24', close: 420.5, name: '環球晶' },
     ]);
+  });
+  test('備用匯率來源：1 台幣＝x 外幣 → 1 外幣＝1/x 台幣', () => {
+    const json = { result: 'success', base_code: 'TWD', rates: { TWD: 1, USD: 0.030769, JPY: 4.65 } };
+    expect(parseErApi(json, '2026-11-25')).toEqual([
+      { currency: 'USD', rate_date: '2026-11-25', rate: 32.500244 },
+      { currency: 'JPY', rate_date: '2026-11-25', rate: 0.215054 },
+    ]);
+    expect(parseErApi({ result: 'error' }, 'x')).toEqual([]);
   });
   test('標題變亂碼時照欄位位置讀', () => {
     const csv = '\uFFFD\uFFFD,x,x,x,x,x,x,x,x,x,x,x,x,x\nUSD,買,32.54,32.865,0,0,0,0,0,0,0,賣,33.21,33.015\n';

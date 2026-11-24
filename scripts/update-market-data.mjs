@@ -1,6 +1,7 @@
 // 每天收盤後執行（GitHub Actions）：
 //   1. 台股收盤價：TWSE OpenAPI（上市）＋ TPEx OpenAPI（上櫃），只存「有人持有」的代號
-//   2. 匯率：台灣銀行牌告匯率，存即期買賣的中間價（1 外幣 = ? 台幣）
+//   2. 匯率：台灣銀行牌告匯率，存即期買賣的中間價（1 外幣 = ? 台幣）；
+//      台銀會擋 GitHub 的伺服器（回驗證頁），擋到時改用 open.er-api.com 的每日匯率
 // 寫入 Supabase 的 stock_prices、fx_rates（這兩張表只有 secret key 能寫）。
 //
 // 環境變數：SUPABASE_URL、SUPABASE_SECRET_KEY（放在 GitHub Actions Secrets，絕對不要放進前端）
@@ -10,6 +11,8 @@
 const TWSE_URL = 'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL';
 const TPEX_URL = 'https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes';
 const BOT_URL = (day = 'day') => `https://rate.bot.com.tw/xrt/flcsv/0/${day}`;
+const ER_URL = 'https://open.er-api.com/v6/latest/TWD';
+const CURRENCIES = ['USD', 'JPY', 'EUR', 'CNY', 'HKD', 'GBP', 'AUD', 'CAD', 'SGD', 'KRW', 'CHF', 'NZD', 'THB'];
 
 /** 台北時間的今天 'YYYY-MM-DD' */
 export const taipeiToday = (now = new Date()) => new Date(now.getTime() + 8 * 3600e3).toISOString().slice(0, 10);
@@ -62,6 +65,13 @@ export function parseBotCsv(text, date) {
   return out;
 }
 
+/** open.er-api.com（以台幣為基準：1 台幣 = x 外幣）→ 1 外幣 = 1/x 台幣 */
+export function parseErApi(json, date) {
+  if (json?.result !== 'success' || !json.rates) return [];
+  return CURRENCIES.filter((c) => Number(json.rates[c]) > 0)
+    .map((c) => ({ currency: c, rate_date: date, rate: Math.round((1 / Number(json.rates[c])) * 1e6) / 1e6 }));
+}
+
 // ---------------------------------------------------------------------
 async function main() {
   const base = process.env.SUPABASE_URL?.replace(/\/$/, '');
@@ -111,11 +121,20 @@ async function main() {
 
   // 2. 今天的匯率
   try {
-    const text = decode(await (await get(BOT_URL('day'))).arrayBuffer());
-    const rows = parseBotCsv(text, today);
-    if (!rows.length) throw new Error(`台銀回傳的內容看不懂，開頭是：${text.slice(0, 200)}`);
+    let rows = [];
+    let source = '台銀';
+    try {
+      const text = decode(await (await get(BOT_URL('day'))).arrayBuffer());
+      rows = parseBotCsv(text, today);
+      if (!rows.length) console.warn(`台銀回傳的不是匯率（開頭：${text.slice(0, 80).replace(/\s+/g, ' ')}），改用備用來源`);
+    } catch (e) { console.warn(`台銀失敗（${e.message}），改用備用來源`); }
+    if (!rows.length) {
+      source = 'open.er-api.com';
+      rows = parseErApi(await (await get(ER_URL)).json(), today);
+    }
+    if (!rows.length) throw new Error('兩個匯率來源都抓不到');
     await upsert('fx_rates', 'currency,rate_date', rows);
-    console.log(`匯率：${rows.length} 種幣別（${today}），USD ${rows.find((r) => r.currency === 'USD')?.rate}`);
+    console.log(`匯率（${source}）：${rows.length} 種幣別（${today}），USD ${rows.find((r) => r.currency === 'USD')?.rate}`);
   } catch (e) { failures++; console.error('匯率失敗：', e.message); }
 
   // 3. 補抓歷史匯率（選用）
