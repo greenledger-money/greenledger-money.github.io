@@ -1,7 +1,8 @@
 // 選帳戶、選分類（分類是樹，可以一層一層點進去，也可以直接選上層）
 import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
-import { Icon, Sheet } from './kit.jsx';
+import { Icon, Sheet, useAction } from './kit.jsx';
+import { parentOptions, validateCategory } from '../lib/categories.js';
 import { accountTypeLabel, ACCOUNT_TYPES } from '../lib/ledger.js';
 import { fmt } from '../lib/money.js';
 
@@ -102,8 +103,56 @@ export function CategoryPicker({ kind, value, onPick, onClose }) {
           </div>
         ))}
       </div>
-      <p className="small muted">分類可以在「更多 › 分類」新增或調整。</p>
+      <AddCategory kind={kind} parentId={parentId} onAdded={onPick} />
+      <p className="small muted">改名、搬移、排序到「更多 › 分類」。</p>
     </Sheet>
+  );
+}
+
+/** 選分類時直接新增：預設放在目前這一層，新增完直接選用 */
+function AddCategory({ kind, parentId, onAdded }) {
+  const { data, actions } = useLedger();
+  const { tree } = data;
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [parent, setParent] = useState(parentId ?? '');
+  const [err, setErr] = useState('');
+  const [run, busy] = useAction();
+  const opts = useMemo(() => parentOptions(tree, kind).filter((o) => !tree.byId.get(o.id)?.archived), [tree, kind]);
+  const start = () => { setParent(parentId ?? ''); setName(''); setErr(''); setOpen(true); };
+  if (!open) {
+    return (
+      <button className="btn block" onClick={start}>
+        <Icon name="plus" className="chev" />新增分類{parentId ? `（在「${tree.byId.get(parentId)?.name}」底下）` : ''}
+      </button>
+    );
+  }
+  const submit = async (e) => {
+    e.preventDefault();
+    const draft = { name: name.trim(), parent_id: parent || null, kind };
+    const bad = validateCategory(tree, draft);
+    if (bad) { setErr(bad); return; }
+    const row = await run(() => actions.saveCategory(draft), `已新增「${draft.name}」`);
+    if (row && row.id) onAdded(row.id);
+  };
+  return (
+    <form className="card" style={{ display: 'grid', gap: 10 }} onSubmit={submit}>
+      <b>新增{kind === 'expense' ? '支出' : '收入'}分類</b>
+      <label className="field"><span>名稱</span>
+        <input className="input" autoFocus value={name} maxLength={30} onChange={(e) => { setName(e.target.value); setErr(''); }} placeholder="例如：寵物" />
+      </label>
+      <label className="field"><span>放在</span>
+        <select className="input" value={parent} onChange={(e) => { setParent(e.target.value); setErr(''); }}>
+          <option value="">最上層</option>
+          {opts.map((o) => <option key={o.id} value={o.id}>{o.label} 底下</option>)}
+        </select>
+      </label>
+      {err && <div className="small" style={{ color: 'var(--expense)' }}>{err}</div>}
+      <div className="row-flex" style={{ gap: 8 }}>
+        <button type="button" className="btn grow" onClick={() => setOpen(false)}>取消</button>
+        <button type="submit" className="btn primary grow" disabled={busy || !name.trim()}>新增並選用</button>
+      </div>
+    </form>
   );
 }
 

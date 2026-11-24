@@ -1,5 +1,6 @@
 // 共用的小元件：圖示、頁面框架、清單列、底部面板、對話框、提示、路由
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { fmt } from '../lib/money.js';
 import { friendlyError } from '../data/errors.js';
 
@@ -156,7 +157,8 @@ export function Sheet({ title, onClose, onSave, saveLabel = '儲存', saving, fu
     addEventListener('keydown', onKey);
     return () => { document.body.style.overflow = prev; removeEventListener('keydown', onKey); };
   }, [onClose]);
-  return (
+  // 用 portal 放到最外層：從記帳畫面裡再開的視窗（例如選分類）不會沿用外面欄位的樣式
+  return createPortal(
     <div className="sheet-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className={`sheet ${full ? 'full' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="sheet-head">
@@ -166,7 +168,8 @@ export function Sheet({ title, onClose, onSave, saveLabel = '儲存', saving, fu
         </div>
         <div className="sheet-body">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
