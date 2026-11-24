@@ -1,7 +1,7 @@
 // 股票：持股（股數、成本、市值、報酬率）、資產配置、已實現損益（按年／月）、個股交易與股利紀錄
 import { useState } from 'react';
 import { useLedger } from '../store.jsx';
-import { Empty, Field, Item, Page, Section, Seg, Sheet, back, go, useAction, useUI } from '../ui/kit.jsx';
+import { Empty, Field, Icon, Item, Page, Section, Seg, Sheet, back, go, useAction, useUI } from '../ui/kit.jsx';
 import { Donut } from '../ui/charts.jsx';
 import { AccountSelect } from '../ui/pickers.jsx';
 import { allocation, defaultSettleDate, estimateNhi, estimateTwFee, estimateTwTax, guessKind, tradeNetAmount } from '../lib/stocks.js';
@@ -267,23 +267,23 @@ export default function Stocks() {
       {!brokerages.length && <div className="notice warn">先到「帳戶」新增證券戶（類型選「證券戶」，例如：國泰台股 TWD、國泰美股 USD）。</div>}
       {noPrice.length > 0 && <div className="notice warn">{noPrice.map((r) => r.symbol).join('、')} 還沒有股價，市值暫時用成本計算。</div>}
 
-      {brokerages.map((b) => {
-        const list = rows.filter((r) => r.accountId === b.id);
-        if (!list.length) return null;
-        return (
-          <Section key={b.id} title={`${b.name}（${b.currency}）`}>
-            <div className="list">
-              {list.map((r) => (
-                <Item key={r.key} onClick={() => go('stock', r.key)}
-                  title={<>{r.symbol} <span className="muted small">{r.name}</span></>}
-                  sub={`${fmtShares(r.shares)} 股 · 成本 ${fmt(r.cost, r.currency)} · 現價 ${fmt(r.price, r.currency)}${r.priceDate ? `（${r.priceDate.slice(5)}）` : ''}`}
-                  value={<span className="num">{fmt(r.marketValue, r.currency)}</span>}
-                  valueSub={<span className={`num ${pnlCls(r.unrealized)}`}>{pct(r.returnPct)}{r.currency !== 'TWD' ? ` · ≈${fmt(r.marketValueTwd)}` : ''}</span>} />
-              ))}
-            </div>
-          </Section>
-        );
-      })}
+      {brokerages.length > 0 && (
+        <Section title="證券戶">
+          <div className="list">
+            {brokerages.map((b) => {
+              const list = rows.filter((r) => r.accountId === b.id);
+              const mv = list.reduce((x, r) => x + r.marketValue, 0);
+              const cost = list.reduce((x, r) => x + r.cost, 0);
+              return (
+                <Item key={b.id} onClick={() => go('account', b.id)} title={b.name}
+                  sub={`持股 ${list.length} 檔${b.currency !== 'TWD' ? ` · ${b.currency}` : ''}`}
+                  value={<span className="num">{fmt(mv, b.currency)}</span>}
+                  valueSub={<span className={`num ${pnlCls(mv - cost)}`}>{fmt(mv - cost, b.currency, { sign: true })}（{cost ? pct((mv - cost) / cost) : '—'}）</span>} />
+              );
+            })}
+          </div>
+        </Section>
+      )}
       {!rows.length && <div className="list"><Empty>還沒有持股。先用「期初持股」輸入目前的股數和均價。</Empty></div>}
 
       {alloc.length > 0 && (
@@ -325,7 +325,7 @@ export function StockDetail({ id }) {
   const divs = data.dividends.filter((dv) => dv.symbol === symbol && dv.brokerage_account_id === accountId).sort((a, b) => b.pay_date.localeCompare(a.pay_date));
   const cur = pos.currency;
   return (
-    <Page title={`${symbol} ${pos.name ?? ''}`} onBack={() => back('stocks')}>
+    <Page title={`${symbol} ${pos.name || data.priceBook.name(market, symbol)}`} onBack={() => back('account', accountId)}>
       <div className="card hero">
         <div>
           <div className="label">{data.accById.get(accountId)?.name} · {pos.kind === 'etf' ? 'ETF' : market === 'TW' ? '台股' : '美股'}</div>
@@ -372,3 +372,64 @@ export function StockDetail({ id }) {
   );
 }
 
+
+/** 一個證券戶的持股（帳戶頁用）：總市值、漲跌、成本，下面列每一檔 */
+export function BrokerageView({ account }) {
+  const { data } = useLedger();
+  const { openTrade } = useUI();
+  const pnlCls = usePnl();
+  const [sheet, setSheet] = useState(null);
+  const cur = account.currency;
+  const rows = data.holdings.filter((r) => r.accountId === account.id);
+  const mv = rows.reduce((x, r) => x + r.marketValue, 0);
+  const cost = rows.reduce((x, r) => x + r.cost, 0);
+  const pnl = mv - cost;
+  const twd = rows.reduce((x, r) => x + r.marketValueTwd, 0);
+  const last = rows.map((r) => r.priceDate).filter(Boolean).sort().pop();
+  const market = cur === 'USD' ? 'US' : 'TW';
+  const noPrice = rows.filter((r) => r.priceSource === 'cost');
+  return (
+    <>
+      <div className="card hero center" style={{ gap: 2 }}>
+        <div className="big num">{fmt(mv, cur, { exact: true })}</div>
+        <div className={`num ${pnlCls(pnl)}`} style={{ fontSize: 18, fontWeight: 600 }}>{fmt(pnl, cur, { sign: true, exact: true })}</div>
+        <div className={`num small ${pnlCls(pnl)}`}>（{cost ? pct(pnl / cost) : '—'}）</div>
+        <div className="small muted">股票總市值{cur !== 'TWD' ? ` ≈ ${fmt(twd)}` : ''}</div>
+        <div className="stats" style={{ borderTop: '1px solid var(--line)', marginTop: 12, paddingTop: 12 }}>
+          <div><b className="num">{fmt(cost, cur)}</b><span className="small muted">股票成本</span></div>
+          <div><b className="num">{rows.length}</b><span className="small muted">持股檔數</span></div>
+          <div><b className={`num ${pnlCls(pnl)}`}>{fmt(pnl, cur, { sign: true })}</b><span className="small muted">未實現損益</span></div>
+        </div>
+      </div>
+      <div className="chips">
+        <button className="chip" onClick={() => openTrade({ initial: { side: 'buy', brokerage_account_id: account.id, market, currency: cur } })}>＋ 買進／賣出</button>
+        <button className="chip" onClick={() => openTrade({ initial: { side: 'opening', brokerage_account_id: account.id, market, currency: cur } })}>＋ 期初持股</button>
+        <button className="chip" onClick={() => setSheet({ kind: 'div' })}>＋ 股利</button>
+        <button className="chip" onClick={() => setSheet({ kind: 'price' })}>手動股價</button>
+      </div>
+      {noPrice.length > 0 && <div className="notice warn">{noPrice.map((r) => r.symbol).join('、')} 還沒有股價，市值暫時用成本計算。</div>}
+      <Section title={`持股（${rows.length}）`}>
+        <div className="list">
+          {rows.length ? rows.map((r) => (
+            <button key={r.key} type="button" className="item" onClick={() => go('stock', r.key)} style={{ alignItems: 'flex-start' }}>
+              <div className="main">
+                <div className="title" style={{ fontWeight: 600 }}>{r.name || data.priceBook.name(r.market, r.symbol) || r.symbol}</div>
+                <div className="sub">{r.symbol}.{r.market === 'TW' ? 'TW' : 'US'}</div>
+                <div className="sub">{fmtShares(r.shares)} 股 · 現價 {fmt(r.price, r.currency, { exact: true })}</div>
+              </div>
+              <div className="value">
+                <span className="num" style={{ fontWeight: 600 }}>{fmt(r.marketValue, r.currency, { exact: true })}</span>
+                <span className={`num ${pnlCls(r.unrealized)}`}>{fmt(r.unrealized, r.currency, { sign: true, exact: true })}</span>
+                <span className={`num small ${pnlCls(r.unrealized)}`}>（{pct(r.returnPct)}）</span>
+              </div>
+              <Icon name="chev" className="chev" />
+            </button>
+          )) : <Empty>還沒有持股。用「期初持股」輸入目前的股數和均價。</Empty>}
+        </div>
+      </Section>
+      {last && <p className="small muted right" style={{ margin: 0 }}>股價日期：{last}</p>}
+      {sheet?.kind === 'div' && <DividendSheet initial={{ brokerage_account_id: account.id, market, currency: cur }} onClose={() => setSheet(null)} />}
+      {sheet?.kind === 'price' && <PriceSheet market={market} onClose={() => setSheet(null)} />}
+    </>
+  );
+}

@@ -42,8 +42,11 @@ export function parseBotCsv(text, date) {
   const lines = String(text).replace(/^﻿/, '').split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return [];
   const head = lines[0].split(',').map((h) => h.trim());
-  const spot = head.flatMap((h, i) => (h === '即期' ? [i] : []));
-  const cash = head.flatMap((h, i) => (h === '現金' ? [i] : []));
+  let spot = head.flatMap((h, i) => (h === '即期' ? [i] : []));
+  let cash = head.flatMap((h, i) => (h === '現金' ? [i] : []));
+  // 標題讀不懂（例如編碼不同變亂碼）時，照台銀固定的欄位位置：現金買 2、即期買 3、現金賣 12、即期賣 13
+  if (spot.length !== 2) spot = [3, 13];
+  if (cash.length !== 2) cash = [2, 12];
   const out = [];
   for (const line of lines.slice(1)) {
     const c = line.split(',').map((x) => x.trim());
@@ -75,6 +78,12 @@ async function main() {
   const upsert = (table, conflict, rows) => (rows.length
     ? rest(`${table}?on_conflict=${conflict}`, { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) })
     : null);
+  /** 台銀的 CSV 可能是 UTF-8 也可能是 Big5，兩種都試 */
+  const decode = (buf) => {
+    const utf8 = new TextDecoder('utf-8').decode(buf);
+    if (!utf8.includes('\uFFFD')) return utf8;
+    try { return new TextDecoder('big5').decode(buf); } catch { return utf8; }
+  };
   const get = async (url) => {
     const res = await fetch(url, { headers: { 'User-Agent': 'ledger-app-price-updater' } });
     if (!res.ok) throw new Error(`${url} → ${res.status}`);
@@ -102,9 +111,11 @@ async function main() {
 
   // 2. 今天的匯率
   try {
-    const rows = parseBotCsv(await (await get(BOT_URL('day'))).text(), today);
+    const text = decode(await (await get(BOT_URL('day'))).arrayBuffer());
+    const rows = parseBotCsv(text, today);
+    if (!rows.length) throw new Error(`台銀回傳的內容看不懂，開頭是：${text.slice(0, 200)}`);
     await upsert('fx_rates', 'currency,rate_date', rows);
-    console.log(`匯率：${rows.length} 種幣別（${today}）`);
+    console.log(`匯率：${rows.length} 種幣別（${today}），USD ${rows.find((r) => r.currency === 'USD')?.rate}`);
   } catch (e) { failures++; console.error('匯率失敗：', e.message); }
 
   // 3. 補抓歷史匯率（選用）
@@ -114,7 +125,7 @@ async function main() {
       const day = d.toISOString().slice(0, 10);
       if (d.getUTCDay() === 0 || d.getUTCDay() === 6) continue;
       try {
-        const rows = parseBotCsv(await (await get(BOT_URL(day))).text(), day);
+        const rows = parseBotCsv(decode(await (await get(BOT_URL(day))).arrayBuffer()), day);
         await upsert('fx_rates', 'currency,rate_date', rows);
         n += rows.length ? 1 : 0;
       } catch (e) { console.warn(`${day} 匯率失敗：${e.message}`); }
@@ -123,7 +134,7 @@ async function main() {
     console.log(`補抓匯率：${n} 天`);
   }
 
-  if (failures === 2) process.exit(1);
+  if (failures) process.exit(1); // 有任何一項失敗就讓 GitHub 顯示紅色
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

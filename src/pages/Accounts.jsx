@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
 import { Empty, Field, Icon, Item, MoveButtons, Money, Page, Section, Seg, Sheet, Toggle, back, go, useAction, useUI } from '../ui/kit.jsx';
 import { TxnList } from '../ui/TxnList.jsx';
+import { BrokerageView } from './Stocks.jsx';
 import { ACCOUNT_TYPES, accountTypeLabel } from '../lib/ledger.js';
 import { CURRENCIES, fmt } from '../lib/money.js';
 
@@ -124,20 +125,26 @@ export function AccountDetail({ id }) {
     && (kind === 'all' || (kind === 'future' ? Date.parse(t.occurred_at) > Date.now() : Date.parse(t.occurred_at) <= Date.now()))), [data.transactions, id, kind]);
   if (!a) return <Page title="帳戶" onBack={() => back('accounts')}><Empty>找不到這個帳戶</Empty></Page>;
   const isBrk = a.type === 'brokerage';
-  const bal = isBrk ? data.stockValue.get(id)?.native ?? 0 : data.balances.get(id);
+  const bal = data.balances.get(id);
   const hasFuture = data.transactions.some((t) => (t.account_id === id || t.to_account_id === id) && Date.parse(t.occurred_at) > Date.now());
+  if (isBrk) {
+    return (
+      <Page title={a.name} onBack={() => back('stocks')} right={<button className="link" onClick={() => setEdit(true)}>編輯</button>}>
+        <BrokerageView account={a} />
+        {edit && <AccountSheet original={a} onClose={() => setEdit(false)} />}
+      </Page>
+    );
+  }
   return (
     <Page title={a.name} onBack={() => back('accounts')} right={<button className="link" onClick={() => setEdit(true)}>編輯</button>}>
       <div className="card hero">
         <div>
-          <div className="label">{accountTypeLabel(a.type)}{a.hidden ? '（已隱藏）' : ''} · {isBrk ? '股票市值' : '目前餘額'}</div>
+          <div className="label">{accountTypeLabel(a.type)}{a.hidden ? '（已隱藏）' : ''} · 目前餘額</div>
           <div className={`big num ${bal < 0 ? 'expense' : ''}`}>{fmt(bal, a.currency, { exact: true })}</div>
           {a.currency !== 'TWD' && data.fx.latest(a.currency) && <div className="small muted">≈ {fmt(bal * data.fx.latest(a.currency))}（匯率 {data.fx.latest(a.currency)}）</div>}
-          <div className="small muted">{isBrk ? '證券戶在淨資產裡用股票市值計算' : `期初 ${fmt(a.opening_balance, a.currency)}，餘額每次都從帳本重新計算`}</div>
+          <div className="small muted">期初 {fmt(a.opening_balance, a.currency)}，餘額每次都從帳本重新計算</div>
         </div>
-        {isBrk
-          ? <button className="btn primary" onClick={() => go('stocks')}><Icon name="stock" className="chev" />看持股</button>
-          : <button className="btn primary" onClick={() => openEntry({ initial: { account_id: id, type: 'expense' } })}><Icon name="plus" className="chev" />在這個帳戶記一筆</button>}
+        <button className="btn primary" onClick={() => openEntry({ initial: { account_id: id, type: 'expense' } })}><Icon name="plus" className="chev" />在這個帳戶記一筆</button>
       </div>
       {hasFuture && <Seg value={kind} onChange={setKind} options={[{ value: 'all', label: '全部' }, { value: 'past', label: '已發生' }, { value: 'future', label: '未到（交割）' }]} />}
       <TxnList txns={txns} accountId={id} dayTotals={false} />
