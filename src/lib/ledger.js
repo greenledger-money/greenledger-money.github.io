@@ -14,6 +14,11 @@ export const ACCOUNT_TYPES = [
   { value: 'loan', label: '借貸' },
   { value: 'other', label: '其他' },
 ];
+/** 照使用者排的順序排帳戶類別（沒排到的照預設順序接在後面） */
+export function orderedTypes(order) {
+  const pos = new Map((Array.isArray(order) ? order : []).map((v, i) => [v, i]));
+  return ACCOUNT_TYPES.map((t, i) => ({ t, k: pos.has(t.value) ? pos.get(t.value) : 100 + i })).sort((a, b) => a.k - b.k).map((x) => x.t);
+}
 export const accountTypeLabel = (v) => ACCOUNT_TYPES.find((t) => t.value === v)?.label ?? v;
 export const TXN_LABEL = { expense: '支出', income: '收入', transfer: '轉帳' };
 

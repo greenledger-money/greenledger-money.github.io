@@ -3,12 +3,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLedger } from '../store.jsx';
 import { Icon, Sheet, Tile, categoryIcon, useAction } from './kit.jsx';
 import { parentOptions, validateCategory } from '../lib/categories.js';
-import { accountTypeLabel, ACCOUNT_TYPES } from '../lib/ledger.js';
+import { accountTypeLabel, ACCOUNT_TYPES, orderedTypes } from '../lib/ledger.js';
 import { fmt } from '../lib/money.js';
 
 export function AccountSelect({ value, onChange, includeHidden = false, filter, placeholder = '選擇帳戶', className = 'input', id, allowEmpty }) {
   const { data } = useLedger();
-  const groups = ACCOUNT_TYPES.map((t) => ({
+  const groups = orderedTypes(data.settings.accountTypeOrder).map((t) => ({
     ...t,
     items: data.accounts.filter((a) => a.type === t.value && (includeHidden || !a.hidden || a.id === value) && (!filter || filter(a))),
   })).filter((g) => g.items.length);

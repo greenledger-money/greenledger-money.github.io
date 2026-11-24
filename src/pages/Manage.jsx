@@ -1,7 +1,7 @@
 // 「更多」選單，以及範本、固定收支、分類的管理頁
 import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
-import { Empty, Field, Group, Icon, Item, MoveButtons, Money, Page, Section, Seg, Sheet, Toggle, back, go, useAction, useUI, Tile } from '../ui/kit.jsx';
+import { Empty, Field, Group, Icon, Item, MoveButtons, Money, Page, Section, Seg, Sheet, Toggle, back, go, useAction, useUI, Tile, categoryIcon } from '../ui/kit.jsx';
 import { AccountSelect, CategoryButton } from '../ui/pickers.jsx';
 import { parentOptions, validateCategory } from '../lib/categories.js';
 import { describe, nextDate, UNIT_LABEL } from '../lib/recurring.js';
@@ -243,6 +243,8 @@ export function Categories() {
   const [kind, setKind] = useState('expense');
   const [edit, setEdit] = useState(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [open, setOpen] = useState(() => new Set()); // 展開的分類，預設全部收起
+  const toggle = (id) => setOpen((o) => { const x = new Set(o); if (x.has(id)) x.delete(id); else x.add(id); return x; });
   const counts = useMemo(() => {
     const m = new Map();
     data.transactions.forEach((t) => t.category_id && m.set(t.category_id, (m.get(t.category_id) ?? 0) + 1));
@@ -251,34 +253,51 @@ export function Categories() {
   const rows = [];
   const walk = (n, depth) => {
     if (n.archived && !showArchived) return;
-    rows.push({ n, depth });
-    n.children.forEach((c) => walk(c, depth + 1));
+    const kids = n.children.filter((c) => showArchived || !c.archived);
+    rows.push({ n, depth, kids: kids.length });
+    if (open.has(n.id)) kids.forEach((c) => walk(c, depth + 1));
   };
   data.tree.roots[kind].forEach((r) => walk(r, 0));
+  // 收起來時顯示整個分類（含子分類）的筆數
+  const total = (n) => { let x = 0; for (const id of data.tree.descendants(n.id)) x += counts.get(id) ?? 0; return x; };
+  const parents = [];
+  const collect = (n) => { if (n.children.length) { parents.push(n.id); n.children.forEach(collect); } };
+  data.tree.roots[kind].forEach(collect);
+  const allOpen = parents.length > 0 && parents.every((id) => open.has(id));
+  const fold = (n, kids) => (kids
+    ? <button className="iconbtn fold" aria-expanded={open.has(n.id)} aria-label={`${open.has(n.id) ? '收起' : '展開'}「${n.name}」`} onClick={() => toggle(n.id)}><Icon name="chev" /></button>
+    : <span className="fold-gap" />);
   return (
     <Page title="分類" onBack={() => back('more')} right={<>
       <button className="link" onClick={() => setSorting(!sorting)}>{sorting ? '完成' : '排序'}</button>
       {!sorting && <button className="iconbtn" aria-label="新增分類" onClick={() => setEdit({ kind })}><Icon name="plus" /></button>}
     </>}>
       <Seg value={kind} onChange={setKind} options={[{ value: 'expense', label: '支出' }, { value: 'income', label: '收入' }]} />
-      <p className="small muted" style={{ margin: 0 }}>{sorting ? '用 ↑ ↓ 調整同一層分類的順序，記帳選分類時也會照這個順序。' : '點分類可以改名、搬移、封存；按 ＋ 在它底下新增子分類（最多三層）。'}</p>
+      <div className="row-flex">
+        <p className="small muted grow" style={{ margin: 0 }}>{sorting ? '用 ↑ ↓ 調整同一層分類的順序，記帳選分類時也會照這個順序。' : '點 › 展開子分類；點名稱可以改名、搬移、封存；按 ＋ 在它底下新增子分類（最多三層）。'}</p>
+        <button className="link small" style={{ flex: 'none' }} onClick={() => setOpen(allOpen ? new Set() : new Set(parents))}>{allOpen ? '全部收起' : '全部展開'}</button>
+      </div>
       <div className="list">
-        {rows.map(({ n, depth }) => (sorting ? (
-          <div key={n.id} className={`item indent-${depth}`} style={{ paddingTop: 0, paddingBottom: 0 }}>
+        {rows.map(({ n, depth, kids }) => (sorting ? (
+          <div key={n.id} className={`item cat-row depth-${depth}`} style={{ paddingTop: 0, paddingBottom: 0 }}>
+            {fold(n, kids)}
             <div className="main"><div className="title">{n.name}</div></div>
             <MoveButtons label={n.name} id={n.id}
               ids={(n.parent_id ? data.tree.byId.get(n.parent_id).children : data.tree.roots[kind]).filter((c) => showArchived || !c.archived).map((c) => c.id)}
               onMove={(ids) => run(() => actions.reorder('categories', ids))} />
           </div>
         ) : (
-          <div key={n.id} className={`item indent-${depth}`} style={{ paddingTop: 0, paddingBottom: 0 }}>
+          <div key={n.id} className={`item cat-row depth-${depth}`} style={{ paddingTop: 0, paddingBottom: 0 }}>
+            {fold(n, kids)}
+            {depth === 0 && <Tile name={categoryIcon(data.tree, n.id)} tone={kind === 'income' ? 'income' : ''} size={34} />}
             <button className="item" style={{ padding: '10px 0', flex: 1 }} onClick={() => setEdit({ original: n })}>
               <div className="main">
-                <div className="title">{n.name}{n.archived && <span className="badge"> 已封存</span>}{n.system_key && <span className="badge"> 系統</span>}</div>
+                <div className="title" style={depth === 0 ? { fontWeight: 600 } : undefined}>{n.name}{n.archived && <span className="badge"> 已封存</span>}{n.system_key && <span className="badge"> 系統</span>}</div>
+                {kids > 0 && !open.has(n.id) && <div className="sub">{kids} 個子分類</div>}
               </div>
-              <span className="small muted num">{counts.get(n.id) ? `${counts.get(n.id)} 筆` : ''}</span>
+              <span className="small muted num">{(kids && !open.has(n.id) ? total(n) : counts.get(n.id)) ? `${kids && !open.has(n.id) ? total(n) : counts.get(n.id)} 筆` : ''}</span>
             </button>
-            {depth < 2 ? <button className="iconbtn" style={{ width: 40, height: 40, color: 'var(--muted)' }} onClick={() => setEdit({ kind, parentId: n.id })} aria-label={`在「${n.name}」底下新增子分類`} title="新增子分類"><Icon name="plus" /></button>
+            {depth < 2 ? <button className="iconbtn" style={{ width: 40, height: 40, color: 'var(--muted)' }} onClick={() => { setOpen((o) => new Set(o).add(n.id)); setEdit({ kind, parentId: n.id }); }} aria-label={`在「${n.name}」底下新增子分類`} title="新增子分類"><Icon name="plus" /></button>
               : <span style={{ width: 40 }} />}
           </div>
         )))}

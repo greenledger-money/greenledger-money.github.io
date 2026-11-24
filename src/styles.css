@@ -282,3 +282,12 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .cp.sel { background: var(--accent-soft) !important; color: var(--accent) !important; font-weight: 700; }
 .cp.lv3 { min-height: 44px; padding-left: 26px; font-size: 15px; color: var(--ink-2); }
 .cp:active { background: var(--surface-2); }
+
+/* ---------- 分類管理：可摺疊 ---------- */
+.cat-row { gap: 8px; padding-left: 6px; }
+.cat-row.depth-1 { padding-left: 34px; } .cat-row.depth-2 { padding-left: 62px; }
+.cat-row .fold { width: 32px; height: 44px; flex: none; color: var(--muted); }
+.cat-row .fold svg { width: 18px; height: 18px; transition: transform .15s; }
+.cat-row .fold[aria-expanded=true] svg { transform: rotate(90deg); }
+.cat-row .fold-gap { width: 32px; flex: none; }
+@media (prefers-reduced-motion: reduce) { .cat-row .fold svg { transition: none; } }

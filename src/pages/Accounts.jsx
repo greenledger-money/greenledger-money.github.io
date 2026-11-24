@@ -5,7 +5,7 @@ import { Empty, Field, Icon, Item, MoveButtons, Money, Page, Section, Seg, Sheet
 import { TxnList } from '../ui/TxnList.jsx';
 import { BrokerageView } from './Stocks.jsx';
 import { WorthCard } from './Home.jsx';
-import { ACCOUNT_TYPES, accountTypeLabel } from '../lib/ledger.js';
+import { ACCOUNT_TYPES, accountTypeLabel, orderedTypes } from '../lib/ledger.js';
 import { CURRENCIES, fmt } from '../lib/money.js';
 
 export function AccountSheet({ original, onClose }) {
@@ -67,6 +67,13 @@ export default function Accounts() {
   const [showHidden, setShowHidden] = useState(false);
   const visible = data.accounts.filter((a) => !a.hidden);
   const hidden = data.accounts.filter((a) => a.hidden);
+  // 帳戶類別（銀行、信用卡…）的順序
+  const types = orderedTypes(data.settings.accountTypeOrder);
+  const shownTypes = types.filter((t) => visible.some((a) => a.type === t.value));
+  const moveType = (ids) => {
+    const rest = types.map((t) => t.value).filter((v) => !ids.includes(v));
+    run(() => actions.updateSettings({ accountTypeOrder: [...ids, ...rest] }));
+  };
   const row = (a, groupIds) => {
     const isBrk = a.type === 'brokerage';
     if (sorting) {
@@ -91,14 +98,15 @@ export default function Accounts() {
       <button className="link" onClick={() => setSorting(!sorting)}>{sorting ? '完成' : '排序'}</button>
       {!sorting && <button className="iconbtn" aria-label="新增帳戶" onClick={() => setEdit({})}><Icon name="plus" /></button>}
     </>}>
-      {sorting && <div className="notice">用 ↑ ↓ 調整同一類帳戶的順序，記帳選帳戶時也會照這個順序。</div>}
+      {sorting && <div className="notice">標題旁的 ↑ ↓ 調整類別（銀行、信用卡…）的順序；帳戶旁的 ↑ ↓ 調整同一類裡的順序。記帳選帳戶時也照這個順序。</div>}
       <WorthCard big />
-      {ACCOUNT_TYPES.map((t) => {
+      {shownTypes.map((t) => {
         const list = visible.filter((a) => a.type === t.value);
-        if (!list.length) return null;
         const sum = data.worth.rows.filter((r) => r.account.type === t.value).reduce((s, r) => s + r.twd, 0);
         return (
-          <Section key={t.value} title={<>{t.label}<span className="num" style={{ marginLeft: 'auto', fontWeight: 400 }}>{fmt(sum)}</span></>}>
+          <Section key={t.value} title={<>{t.label}{sorting
+            ? <span style={{ marginLeft: 'auto' }}><MoveButtons label={`「${t.label}」這一類`} ids={shownTypes.map((x) => x.value)} id={t.value} onMove={moveType} /></span>
+            : <span className="num" style={{ marginLeft: 'auto', fontWeight: 400 }}>{fmt(sum)}</span>}</>}>
             <div className="list">{list.map((a) => row(a, list.map((x) => x.id)))}</div>
           </Section>
         );

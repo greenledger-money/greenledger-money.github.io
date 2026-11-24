@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS = {
   homeShowWorth: true,
   homeShowTemplates: true,
   worthIncludeStocks: true,  // 淨資產要不要算股票市值
+  accountTypeOrder: [],      // 帳戶類別（銀行、信用卡…）的順序
   // 報表
   includeExceptions: true,    // 月報預設「含例外」
   reportPeriod: 'month',      // 報表預設看「月」或「年」
