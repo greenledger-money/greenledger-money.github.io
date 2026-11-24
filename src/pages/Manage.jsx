@@ -1,7 +1,7 @@
 // 「更多」選單，以及範本、固定收支、分類的管理頁
 import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
-import { Empty, Field, Group, Icon, Item, MoveButtons, Money, Page, Section, Seg, Sheet, Toggle, back, go, useAction, useUI } from '../ui/kit.jsx';
+import { Empty, Field, Group, Icon, Item, MoveButtons, Money, Page, Section, Seg, Sheet, Toggle, back, go, useAction, useUI, Tile } from '../ui/kit.jsx';
 import { AccountSelect, CategoryButton } from '../ui/pickers.jsx';
 import { parentOptions, validateCategory } from '../lib/categories.js';
 import { describe, nextDate, UNIT_LABEL } from '../lib/recurring.js';
@@ -11,7 +11,7 @@ import { dayLabel, todayStr } from '../lib/dates.js';
 export function More() {
   const { data, user } = useLedger();
   const links = [
-    ['transactions', 'list', '明細', '按月份查詢、搜尋備註'],
+    ['transactions', 'doc', '明細', '按月份查詢、搜尋備註'],
     ['stocks', 'stock', '股票', `${data.holdings.length} 檔持股`],
     ['templates', 'bolt', '範本', `${data.templates.length} 個`],
     ['recurring', 'repeat', '固定收支', `${data.recurring_rules.filter((r) => r.active).length} 個進行中`],
@@ -24,7 +24,7 @@ export function More() {
     <Page title="更多">
       <div className="list">
         {links.map(([href, icon, title, sub]) => (
-          <Item key={href} href={`#${href}`} left={<Icon name={icon} className="chev" />} title={title} sub={sub} chevron />
+          <Item key={href} href={`#${href}`} left={<Tile name={icon} />} title={title} sub={sub} chevron />
         ))}
       </div>
     </Page>

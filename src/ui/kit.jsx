@@ -10,7 +10,7 @@ const PATHS = {
   wallet: 'M3 7a2 2 0 0 1 2-2h13v4M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2Zm13 7h.01',
   plus: 'M12 5v14M5 12h14',
   chart: 'M4 20V10m6 10V4m6 16v-7m4 7H2',
-  more: 'M5 12h.01M12 12h.01M19 12h.01',
+  more: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM8 12h.01M12 12h.01M16 12h.01',
   chev: 'm9 6 6 6-6 6',
   back: 'm15 6-6 6 6 6',
   down: 'm6 9 6 6 6-6',
@@ -33,7 +33,57 @@ const PATHS = {
   split: 'M6 3v6a6 6 0 0 0 6 6 6 6 0 0 1 6 6M18 3v6a6 6 0 0 1-3 5.2M3 6l3-3 3 3m6 0 3-3 3 3',
   user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-8 9a8 8 0 0 1 16 0',
   calendar: 'M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM4 10h16M8 2v4m8-4v4',
+  food: 'M7 3v18M4 3v5a3 3 0 0 0 6 0V3M17 21V3c-2.2 0-3.5 3-3.5 6.5S15 13 17 13',
+  coffee: 'M4 8h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM17 9h1a3 3 0 0 1 0 6h-1M8 2v3m4-3v3M4 21h13',
+  bus: 'M5 17V6a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v11zM5 11h14M8 14h.01M16 14h.01M7 17v3m10-3v3',
+  plane: 'M10 14 3 11l2-2 6 1 5-5a2 2 0 0 1 3 3l-5 5 1 6-2 2-3-7z',
+  bag: 'M5 8h14l-1 13H6zM9 8V6a3 3 0 0 1 6 0v2',
+  shirt: 'M8 3 3 6l2 4 2-1v12h10V9l2 1 2-4-5-3a4 4 0 0 1-8 0Z',
+  game: 'M6 9h12a4 4 0 0 1 0 8c-1.5 0-2.5-1-3.5-2h-5C8.5 16 7.5 17 6 17a4 4 0 0 1 0-8Zm2 2v3m-1.5-1.5h3M15 12h.01M17 14h.01',
+  receipt: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h3',
+  medical: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-13v8m-4-4h8',
+  book: 'M4 19V5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2 2 2 0 0 0 2 2h13v-4',
+  gift: 'M4 11h16v10H4zM3 7h18v4H3zM12 7v14M12 7S10.5 3 8 3a2 2 0 0 0 0 4m4 0s1.5-4 4-4a2 2 0 0 1 0 4',
+  paw: 'M12 13c-3 0-5 3-5 5a2 2 0 0 0 2 2c1 0 2-.5 3-.5s2 .5 3 .5a2 2 0 0 0 2-2c0-2-2-5-5-5ZM5 9.5a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0M8 5.5a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0M13 5.5a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0M16 9.5a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0',
+  phone: 'M7 2h10v20H7zM11 18h2',
+  briefcase: 'M3 8h18v12H3zM9 8V5h6v3M3 13h18',
+  star: 'M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z',
+  percent: 'M19 5 5 19M7 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm10 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z',
+  coins: 'M8 8a5 3 0 1 0 10 0A5 3 0 1 0 8 8Zm0 0v4c0 1.7 2.2 3 5 3s5-1.3 5-3V8M6 12.5C4.8 13 4 13.8 4 14.6c0 1.7 2.2 3 5 3 1.3 0 2.5-.3 3.4-.8',
+  card: 'M3 6h18v12H3zM3 10h18M7 15h4',
+  bank: 'M3 10 12 4l9 6zM5 10v8m4.7-8v8m4.6-8v8M19 10v8M3 21h18',
+  cash: 'M3 7h18v10H3zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 10v.01M18 14v.01',
+  people: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-6 9a6 6 0 0 1 12 0M16 5a3 3 0 0 1 0 6m2 9a6 6 0 0 0-3-5.2',
+  doc: 'M6 3h8l4 4v14H6zM14 3v4h4M9 12h6M9 16h6',
+  swap: 'M7 4 3 8l4 4M3 8h14m0 12 4-4-4-4m4 4H7',
+  arrowUp: 'M12 19V5m-6 6 6-6 6 6',
+  arrowDown: 'M12 5v14m-6-6 6 6 6-6',
+  layers: 'm12 3 9 5-9 5-9-5zm-9 9 9 5 9-5M3 16l9 5 9-5',
 };
+/** 圓角方塊裡的圖示（像「更多」清單左邊那種） */
+export function Tile({ name, tone = '', round = false, size }) {
+  return <span className={`tile ${tone} ${round ? 'round' : ''}`} style={size ? { width: size, height: size } : undefined}><Icon name={name} /></span>;
+}
+
+// 分類 → 圖示：從最底層往上找第一個對得上的關鍵字
+const CAT_ICONS = [
+  [/飲料|咖啡|茶|點心/, 'coffee'], [/早餐|午餐|晚餐|宵夜|飲食|食|餐|喝酒/, 'food'],
+  [/旅|機票|住宿|出去玩/, 'plane'], [/交通|車|捷運|加油|停車|高鐵|計程|悠遊/, 'bus'],
+  [/房|租|居住|水電|瓦斯|管理費/, 'home'], [/衣|服飾|鞋/, 'shirt'], [/日常|用品|生活|超市/, 'bag'],
+  [/娛樂|遊戲|電影|唱歌|運動/, 'game'], [/繳費|訂閱|電信|網路|手續費/, 'receipt'], [/醫|藥|健康|保險/, 'medical'],
+  [/學|書|課|教育/, 'book'], [/人際|禮|紅包|請客|交際/, 'gift'], [/寵物/, 'paw'], [/3C|電子|手機|電腦/, 'phone'],
+  [/例外|年度/, 'calendar'], [/股利|配息/, 'coins'], [/股票|投資|證券/, 'stock'], [/利息/, 'percent'], [/獎金|獎/, 'star'], [/薪|工作|兼職/, 'briefcase'],
+];
+export function categoryIcon(tree, id) {
+  const chain = id ? tree.chain(id) : [];
+  for (let i = chain.length - 1; i >= 0; i--) {
+    for (const [re, icon] of CAT_ICONS) if (re.test(chain[i].name)) return icon;
+  }
+  return 'tag';
+}
+const ACC_ICONS = { cash: 'cash', bank: 'bank', credit_card: 'card', e_payment: 'phone', brokerage: 'stock', friends_owe: 'people', loan: 'doc', other: 'wallet' };
+export const accountIcon = (type) => ACC_ICONS[type] ?? 'wallet';
+
 export function Icon({ name, className, title }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden={title ? undefined : true} role={title ? 'img' : undefined}>

@@ -1,7 +1,7 @@
 // 選帳戶、選分類（分類是樹，可以一層一層點進去，也可以直接選上層）
 import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
-import { Icon, Sheet, useAction } from './kit.jsx';
+import { Icon, Sheet, Tile, categoryIcon, useAction } from './kit.jsx';
 import { parentOptions, validateCategory } from '../lib/categories.js';
 import { accountTypeLabel, ACCOUNT_TYPES } from '../lib/ledger.js';
 import { fmt } from '../lib/money.js';
@@ -92,6 +92,7 @@ export function CategoryPicker({ kind, value, onPick, onClose }) {
         {nodes.map((n) => (
           <div key={n.id} className="item" style={{ padding: 0 }}>
             <button className="item" style={{ flex: 1 }} onClick={() => onPick(n.id)}>
+              <Tile name={categoryIcon(tree, n.id)} tone={kind === 'income' ? 'income' : ''} size={34} />
               <div className="main"><div className="title">{n.name}{n.archived ? '（已封存）' : ''}</div></div>
               {value === n.id && <Icon name="check" className="chev" />}
             </button>

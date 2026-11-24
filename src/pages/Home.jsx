@@ -1,7 +1,7 @@
 // 首頁：本月收支與結餘、淨資產（含股票市值）、待確認清單、範本、最近明細
 import { useMemo, useRef, useState } from 'react';
 import { useLedger } from '../store.jsx';
-import { Empty, Icon, Money, Page, Section, go, useAction, useUI } from '../ui/kit.jsx';
+import { Empty, Icon, Money, Page, Section, Tile, go, useAction, useUI } from '../ui/kit.jsx';
 import { TxnRow } from '../ui/TxnList.jsx';
 import { counts, summarize, twdOf } from '../lib/ledger.js';
 import { fmt } from '../lib/money.js';
@@ -103,6 +103,7 @@ export function WorthCard({ big = false }) {
   return (
     <div className="card hero" style={{ gap: 6 }}>
       <div className="row-flex">
+        <Tile name="layers" size={32} />
         <span className="label grow">淨資產{inc ? '（含股票）' : '（不含股票）'}</span>
         <button className="chip" aria-pressed={inc} onClick={() => run(() => actions.updateSettings({ worthIncludeStocks: !inc }))} style={{ minHeight: 30, fontSize: 13 }}>
           含股票
@@ -175,9 +176,9 @@ export default function Home() {
           <button className="iconbtn" aria-label="下一週" onClick={() => shiftWeek(1)}><Icon name="chev" /></button>
         </div>
         <div className="stats" style={{ padding: '0 8px' }}>
-          <div><span className="label small muted">{m} 月收入</span><b className="num income">{fmt(s.income)}</b></div>
-          <div><span className="label small muted">{m} 月支出</span><b className="num expense">{fmt(s.expense)}</b></div>
-          <div><span className="label small muted">結餘</span><b className={`num ${s.net < 0 ? 'expense' : ''}`}>{fmt(s.net)}</b></div>
+          <div className="stat"><Tile name="arrowUp" tone="solid income" round size={26} /><span className="label small muted">{m} 月收入</span><b className="num income">{fmt(s.income)}</b></div>
+          <div className="stat"><Tile name="arrowDown" tone="solid expense" round size={26} /><span className="label small muted">{m} 月支出</span><b className="num expense">{fmt(s.expense)}</b></div>
+          <div className="stat"><Tile name="wallet" tone="solid" round size={26} /><span className="label small muted">結餘</span><b className={`num ${s.net < 0 ? 'expense' : ''}`}>{fmt(s.net)}</b></div>
         </div>
         {day !== today && <button className="link" style={{ justifySelf: 'center', padding: 0 }} onClick={() => setDay(today)}>回到今天</button>}
       </div>

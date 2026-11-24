@@ -1,6 +1,6 @@
 // 交易清單（依日期分組）。給首頁、明細頁、帳戶頁共用。
 import { useLedger } from '../store.jsx';
-import { useUI } from './kit.jsx';
+import { Tile, categoryIcon, useUI } from './kit.jsx';
 import { fmt } from '../lib/money.js';
 import { dayLabel, localDate, timeLabel } from '../lib/dates.js';
 import { twdOf } from '../lib/ledger.js';
@@ -31,6 +31,9 @@ export function TxnRow({ t, accountId }) {
   const subParts = [timeLabel(t.occurred_at), t.type !== 'transfer' && !accountId ? a?.name : null, t.note].filter(Boolean);
   return (
     <button type="button" className="item" onClick={() => openEntry({ original: t })}>
+      {t.type === 'transfer'
+        ? <Tile name="swap" tone="plain" round />
+        : <Tile name={categoryIcon(tree, t.category_id)} tone={t.type === 'income' ? 'income' : ''} round />}
       <div className="main">
         <div className="title">{title}</div>
         <div className="sub">{subParts.join(' · ')}</div>

@@ -1,7 +1,7 @@
 // 匯出 CSV、設定（Passkey、預設值、刪除帳號）、隱私權政策
 import { useEffect, useState } from 'react';
 import { useLedger } from '../store.jsx';
-import { Field, Group, Icon, Item, Page, Section, Seg, Toggle, back, downloadText, useAction, useUI } from '../ui/kit.jsx';
+import { Field, Group, Icon, Item, Page, Section, Seg, Toggle, back, downloadText, useAction, useUI, Tile } from '../ui/kit.jsx';
 import { AccountSelect, CategoryButton } from '../ui/pickers.jsx';
 import { toCSV, transactionsToRows } from '../lib/csv.js';
 import { monthRange, thisMonth, todayStr, ymd } from '../lib/dates.js';
@@ -148,7 +148,7 @@ export function Settings() {
     <Page title="設定" onBack={() => back('more')}>
       <Section title="帳號">
         <div className="list">
-          <Item left={<Icon name="user" className="chev" />} title={user.demo ? '試用模式' : user.email} sub={user.demo ? '資料只存在這台裝置的瀏覽器' : '用 Email 登入'} />
+          <Item left={<Tile name="user" />} title={user.demo ? '試用模式' : user.email} sub={user.demo ? '資料只存在這台裝置的瀏覽器' : '用 Email 登入'} />
         </div>
       </Section>
       {!user.demo && (
@@ -209,7 +209,7 @@ export function Settings() {
       </Section>
       <Section title="其他">
         <div className="list">
-          <Item href="#privacy" left={<Icon name="shield" className="chev" />} title="隱私權政策" />
+          <Item href="#privacy" left={<Tile name="shield" />} title="隱私權政策" />
           <Item onClick={() => backend.signOut()} title={user.demo ? '離開試用（資料保留在這台裝置）' : '登出'} />
         </div>
       </Section>
