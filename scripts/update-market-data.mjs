@@ -1,4 +1,4 @@
-// 每天收盤後執行（GitHub Actions）：
+// 每天收盤後執行（GitHub Actions），改了這支程式推上去也會馬上跑一次：
 //   1. 台股收盤價：TWSE OpenAPI（上市）＋ TPEx OpenAPI（上櫃），只存「有人持有」的代號
 //   2. 匯率：台灣銀行牌告匯率，存即期買賣的中間價（1 外幣 = ? 台幣）；
 //      台銀會擋 GitHub 的伺服器（回驗證頁），擋到時改用 open.er-api.com 的每日匯率
