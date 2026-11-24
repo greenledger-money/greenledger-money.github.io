@@ -1,0 +1,23 @@
+# 週一到週五台北時間 16:30：更新台股收盤價、台銀匯率
+name: 每日更新股價與匯率
+on:
+  schedule:
+    - cron: '30 8 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      fx_from:
+        description: '補抓匯率的起始日（YYYY-MM-DD，選填；CW 匯入外幣帳戶前跑一次）'
+        required: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/update-market-data.mjs ${{ inputs.fx_from && format('--fx-from={0}', inputs.fx_from) || '' }}
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://qopkoivdrildkdihnyto.supabase.co' }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}

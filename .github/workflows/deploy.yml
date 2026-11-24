@@ -1,0 +1,50 @@
+# push 到 main 就自動測試、打包、部署到 GitHub Pages
+name: 部署到 GitHub Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - run: bun test tests/
+      - run: bun run build
+      - name: 有設定 repo Variables 的話，用它覆蓋 public/config.js（只放 publishable key）
+        if: ${{ vars.SUPABASE_URL != '' }}
+        env:
+          APP_NAME: ${{ vars.APP_NAME }}
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          node -e "
+            const c = { appName: process.env.APP_NAME || '記帳', supabaseUrl: process.env.SUPABASE_URL || '', supabasePublishableKey: process.env.SUPABASE_PUBLISHABLE_KEY || '' };
+            if (/^sb_secret_|service_role/.test(c.supabasePublishableKey)) { console.error('SUPABASE_PUBLISHABLE_KEY 放到 secret key 了！'); process.exit(1); }
+            require('fs').writeFileSync('dist/config.js', 'window.APP_CONFIG = ' + JSON.stringify(c, null, 2) + ';\n');
+          "
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

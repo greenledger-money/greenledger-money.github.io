@@ -1,0 +1,17 @@
+{
+  "name": "ledger-app",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "記帳 App：PWA＋Supabase",
+  "scripts": {
+    "build": "bun scripts/build.mjs",
+    "dev": "bun scripts/dev.mjs",
+    "test": "bun test tests/",
+    "test:db": "bash supabase/tests/run.sh"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  }
+}
