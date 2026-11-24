@@ -1,4 +1,4 @@
-# 週一到週五台北時間 16:30：更新台股收盤價、台銀匯率（改了這支程式推上去時也會馬上跑一次）
+# 台北時間 16:30 和隔天 08:30：更新台股收盤價、匯率（改了這支程式推上去時也會馬上跑一次）
 name: 每日更新股價與匯率
 on:
   push:
@@ -7,7 +7,8 @@ on:
       - scripts/update-market-data.mjs
       - .github/workflows/market-data.yml
   schedule:
-    - cron: '30 8 * * 1-5'
+    - cron: '30 8 * * 1-5'    # 台北 16:30
+    - cron: '30 0 * * 1-6'    # 台北 08:30（證交所資料常晚一天才更新，隔天早上再補一次）
   workflow_dispatch:
     inputs:
       fx_from:
