@@ -269,3 +269,16 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .prose ul { padding-left: 1.2em; margin: 6px 0; }
 .progress { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
 .progress > i { display: block; height: 100%; background: var(--accent); transition: width .2s; }
+
+/* ---------- 選分類：左主分類、右子分類（像 CWMoney） ---------- */
+.catpick { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); height: min(58dvh, 540px); background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.catpick .col { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; padding-bottom: 8px; }
+.catpick .col + .col { border-left: 1px solid var(--line); }
+.catpick .colhead { position: sticky; top: 0; z-index: 1; flex: none; background: var(--surface); border-bottom: 1px solid var(--line); text-align: center; font-weight: 700; padding: 10px 6px; }
+.cp { flex: none; display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 7px 10px; border: 0; background: none; text-align: left; color: var(--ink); font-size: 16px; }
+.cp .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.catpick .col:first-child .cp { color: var(--muted); }
+.catpick .col:first-child .cp.on { color: var(--ink); font-weight: 700; background: var(--surface-2); }
+.cp.sel { background: var(--accent-soft) !important; color: var(--accent) !important; font-weight: 700; }
+.cp.lv3 { min-height: 44px; padding-left: 26px; font-size: 15px; color: var(--ink-2); }
+.cp:active { background: var(--surface-2); }

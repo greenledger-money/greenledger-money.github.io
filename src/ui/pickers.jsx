@@ -1,5 +1,5 @@
 // 選帳戶、選分類（分類是樹，可以一層一層點進去，也可以直接選上層）
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLedger } from '../store.jsx';
 import { Icon, Sheet, Tile, categoryIcon, useAction } from './kit.jsx';
 import { parentOptions, validateCategory } from '../lib/categories.js';
@@ -46,11 +46,17 @@ export function CategoryButton({ kind, value, onChange, placeholder = '選擇分
 export function CategoryPicker({ kind, value, onPick, onClose }) {
   const { data } = useLedger();
   const { tree } = data;
-  const start = value && tree.byId.get(value)?.kind === kind ? tree.byId.get(value).parent_id : null;
-  const [parentId, setParentId] = useState(start ?? null);
-  const parent = parentId ? tree.byId.get(parentId) : null;
-  const nodes = (parent ? parent.children : tree.roots[kind]).filter((n) => !n.archived || n.id === value);
-  const crumbs = parentId ? tree.chain(parentId) : [];
+  const cur = value && tree.byId.get(value)?.kind === kind ? tree.chain(value) : [];
+  const inCur = (n) => cur.some((c) => c.id === n.id);
+  const live = (n) => !n.archived || inCur(n);
+  const roots = tree.roots[kind].filter(live);
+  const [mainId, setMainId] = useState(cur[0]?.id ?? roots[0]?.id ?? null);
+  const main = mainId ? tree.byId.get(mainId) : null;
+  const subs = main ? main.children.filter(live) : [];
+  const box = useRef(null);
+
+  // 打開時把目前選的捲到看得到的地方
+  useEffect(() => { box.current?.querySelectorAll('.cp.on, .cp.sel').forEach((el) => el.scrollIntoView({ block: 'nearest' })); }, []);
 
   // 最近用過的分類（從交易紀錄找最近 6 個不重複的）
   const recent = useMemo(() => {
@@ -65,46 +71,60 @@ export function CategoryPicker({ kind, value, onPick, onClose }) {
     return out;
   }, [data.transactions, kind, tree]);
 
+  // 點主分類：有子分類 → 右邊列出來；沒有 → 直接選
+  const tapMain = (n) => (n.children.some(live) ? setMainId(n.id) : onPick(n.id));
+  const tone = kind === 'income' ? 'income' : '';
+  const check = (id) => value === id && <Icon name="check" className="chev" />;
+
   return (
-    <Sheet title={kind === 'expense' ? '支出分類' : '收入分類'} onClose={onClose}>
-      {!parentId && recent.length > 0 && (
+    <Sheet title={kind === 'expense' ? '選擇支出分類' : '選擇收入分類'} onClose={onClose}>
+      {recent.length > 0 && (
         <div className="chips" aria-label="最近用過">
           {recent.map((n) => (
             <button key={n.id} className="chip" aria-pressed={n.id === value} onClick={() => onPick(n.id)}>{tree.path(n.id)}</button>
           ))}
         </div>
       )}
-      {parentId && (
-        <div className="crumbs">
-          <button onClick={() => setParentId(null)}>全部</button>
-          {crumbs.map((c) => (
-            <span key={c.id} className="row-flex">› <button onClick={() => setParentId(c.id)}>{c.name}</button></span>
-          ))}
-        </div>
-      )}
-      <div className="list">
-        {parent && (
-          <button className="item" onClick={() => onPick(parent.id)}>
-            <div className="main"><div className="title">就選「{parent.name}」</div><div className="sub">不細分到下一層</div></div>
-            {value === parent.id && <Icon name="check" className="chev" />}
-          </button>
-        )}
-        {nodes.map((n) => (
-          <div key={n.id} className="item" style={{ padding: 0 }}>
-            <button className="item" style={{ flex: 1 }} onClick={() => onPick(n.id)}>
-              <Tile name={categoryIcon(tree, n.id)} tone={kind === 'income' ? 'income' : ''} size={34} />
-              <div className="main"><div className="title">{n.name}{n.archived ? '（已封存）' : ''}</div></div>
-              {value === n.id && <Icon name="check" className="chev" />}
-            </button>
-            {n.children.some((c) => !c.archived) && (
-              <button className="iconbtn" aria-label={`看「${n.name}」的子分類`} onClick={() => setParentId(n.id)} style={{ borderLeft: '1px solid var(--line)', borderRadius: 0, width: 64, height: 'auto', alignSelf: 'stretch', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                <span className="small muted" style={{ marginRight: 2 }}>{n.children.filter((c) => !c.archived).length}</span><Icon name="chev" />
+      <div className="catpick" ref={box}>
+        <div className="col" role="group" aria-label="主分類">
+          <div className="colhead">主分類</div>
+          {roots.map((n) => {
+            const kids = n.children.filter(live).length;
+            return (
+              <button key={n.id} type="button" className={`cp ${n.id === mainId ? 'on' : ''} ${value === n.id ? 'sel' : ''}`} onClick={() => tapMain(n)}
+                aria-label={kids ? `${n.name}（${kids} 個子分類）` : n.name}>
+                <Tile name={categoryIcon(tree, n.id)} tone={tone} round size={38} />
+                <span className="name">{n.name}{n.archived ? '（封存）' : ''}</span>
+                {kids > 0 ? <Icon name="chev" className="chev" /> : check(n.id)}
               </button>
-            )}
-          </div>
-        ))}
+            );
+          })}
+        </div>
+        <div className="col sub" role="group" aria-label="子分類">
+          <div className="colhead">子分類</div>
+          {main && subs.length > 0 && (
+            <button type="button" className={`cp ${value === main.id ? 'sel' : ''}`} onClick={() => onPick(main.id)}>
+              <Tile name={categoryIcon(tree, main.id)} tone="plain" round size={38} />
+              <span className="name">就選「{main.name}」</span>{check(main.id)}
+            </button>
+          )}
+          {subs.map((c) => (
+            <div key={c.id} style={{ display: 'contents' }}>
+              <button type="button" className={`cp ${value === c.id ? 'sel' : ''}`} onClick={() => onPick(c.id)}>
+                <Tile name={categoryIcon(tree, c.id)} tone={tone} round size={38} />
+                <span className="name">{c.name}{c.archived ? '（封存）' : ''}</span>{check(c.id)}
+              </button>
+              {c.children.filter(live).map((g) => (
+                <button key={g.id} type="button" className={`cp lv3 ${value === g.id ? 'sel' : ''}`} onClick={() => onPick(g.id)}>
+                  <span className="name">└ {g.name}</span>{check(g.id)}
+                </button>
+              ))}
+            </div>
+          ))}
+          {main && !subs.length && <div className="empty">「{main.name}」沒有子分類</div>}
+        </div>
       </div>
-      <AddCategory kind={kind} parentId={parentId} onAdded={onPick} />
+      <AddCategory kind={kind} parentId={mainId} onAdded={onPick} />
       <p className="small muted">改名、搬移、排序到「更多 › 分類」。</p>
     </Sheet>
   );
@@ -120,12 +140,14 @@ function AddCategory({ kind, parentId, onAdded }) {
   const [err, setErr] = useState('');
   const [run, busy] = useAction();
   const opts = useMemo(() => parentOptions(tree, kind).filter((o) => !tree.byId.get(o.id)?.archived), [tree, kind]);
-  const start = () => { setParent(parentId ?? ''); setName(''); setErr(''); setOpen(true); };
+  const start = (p) => { setParent(p ?? ''); setName(''); setErr(''); setOpen(true); };
+  const pName = parentId ? tree.byId.get(parentId)?.name : null;
   if (!open) {
     return (
-      <button className="btn block" onClick={start}>
-        <Icon name="plus" className="chev" />新增分類{parentId ? `（在「${tree.byId.get(parentId)?.name}」底下）` : ''}
-      </button>
+      <div className="row-flex" style={{ gap: 8 }}>
+        <button className="btn grow" onClick={() => start(null)}><Icon name="plus" className="chev" />主分類</button>
+        {pName && <button className="btn grow" onClick={() => start(parentId)} aria-label={`新增「${pName}」的子分類`}><Icon name="plus" className="chev" />子分類</button>}
+      </div>
     );
   }
   const submit = async (e) => {
