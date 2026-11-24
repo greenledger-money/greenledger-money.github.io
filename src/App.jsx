@@ -82,6 +82,7 @@ function Shell({ openEntry }) {
   const current = TAB_OF[route.name] ?? (TABS.some((t) => t.name === route.name) ? route.name : 'home');
   return (
     <div className="app">
+      {status.warning && <div className="notice warn banner" style={{ marginTop: 'calc(env(safe-area-inset-top) + 8px)' }}>{status.warning}</div>}
       {status.offline && (
         <div className="notice warn banner" style={{ marginTop: 'calc(env(safe-area-inset-top) + 8px)' }}>
           離線中：顯示 {status.snapshotAt ? new Date(status.snapshotAt).toLocaleString('zh-TW', { hour12: false }) : '上次'} 的資料，只能查看，不能記帳。

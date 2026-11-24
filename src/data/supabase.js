@@ -7,6 +7,8 @@ import { TABLES } from './relations.js';
 // Passkey 需要 supabase-js 2.105.0 以上
 const SDK_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 const PAGE = 1000;
+// 分頁要有固定順序；不是每張表都有 id 欄位
+const ORDER = { profiles: ['user_id'], fx_rates: ['currency', 'rate_date'], stock_prices: ['market', 'symbol', 'price_date'] };
 const CHUNK = 500;
 
 const unwrap = ({ data, error }) => { if (error) throw error; return data; };
@@ -23,7 +25,9 @@ export async function createSupabaseBackend({ url, key }) {
   async function selectAll(table, build = (q) => q) {
     const out = [];
     for (let from = 0; ; from += PAGE) {
-      const rows = unwrap(await build(sb.from(table).select('*')).order(table === 'profiles' ? 'user_id' : 'id').range(from, from + PAGE - 1));
+      let q = build(sb.from(table).select('*'));
+      for (const col of ORDER[table] ?? ['id']) q = q.order(col);
+      const rows = unwrap(await q.range(from, from + PAGE - 1));
       out.push(...rows);
       if (rows.length < PAGE) break;
     }

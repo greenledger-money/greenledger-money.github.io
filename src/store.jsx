@@ -141,8 +141,11 @@ export function LedgerProvider({ backend, user, children }) {
       t = await bootstrap(t);
       setTables(t);
       tablesRef.current = t;
-      const sh = await loadShared(t);
-      setStatus({ loading: false, error: null, offline: false });
+      // 股價、匯率讀不到不影響記帳：顯示提醒，其他照常（固定收支、股票損益照樣同步）
+      let sh = { fx_rates: [], stock_prices: [] };
+      let warning = null;
+      try { sh = await loadShared(t); } catch (e) { warning = `股價、匯率讀取失敗：${friendlyError(e)}`; console.error(e); }
+      setStatus({ loading: false, error: null, offline: false, warning });
       if (backend.kind === 'supabase') {
         try { localStorage.setItem(snapKey(user.id), JSON.stringify({ tables: t, shared: sh, at: Date.now() })); } catch { /* 太大就不存 */ }
       }
