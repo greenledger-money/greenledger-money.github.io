@@ -1,11 +1,11 @@
 // 首頁：本月收支與結餘、淨資產（含股票市值）、待確認清單、範本、最近明細
-import { useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useLedger } from '../store.jsx';
 import { Empty, Icon, Money, Page, Section, go, useAction, useUI } from '../ui/kit.jsx';
-import { TxnList } from '../ui/TxnList.jsx';
-import { summarize } from '../lib/ledger.js';
+import { TxnRow } from '../ui/TxnList.jsx';
+import { counts, summarize, twdOf } from '../lib/ledger.js';
 import { fmt } from '../lib/money.js';
-import { dayLabel, monthRange, thisMonth, todayStr } from '../lib/dates.js';
+import { addDays, dayLabel, localDate, monthRange, parseYmd, todayStr } from '../lib/dates.js';
 import { describe } from '../lib/recurring.js';
 
 export function PendingList() {
@@ -94,50 +94,109 @@ function TemplateBar() {
   );
 }
 
-export default function Home() {
-  const { data, user } = useLedger();
-  const month = thisMonth();
-  const s = useMemo(() => summarize(data.transactions, data.accById, { ...monthRange(month), includeExceptions: data.settings.includeExceptions }), [data, month]);
-  const stockTotal = [...data.stockValue.values()].reduce((x, v) => x + v.twd, 0);
-  const { homeShowWorth, homeShowTemplates, homeRecentCount } = data.settings;
-  const recent = data.transactions.filter((t) => Date.parse(t.occurred_at) <= Date.now() + 864e5).slice(0, Number(homeRecentCount) || 0);
-  const m = Number(month.slice(5));
-
+/** 淨資產卡：可以切換含不含股票（設定會記住） */
+export function WorthCard({ big = false }) {
+  const { data, actions } = useLedger();
+  const [run] = useAction();
+  const inc = data.settings.worthIncludeStocks;
+  const total = inc ? data.worth.total : data.worthNoStocks;
   return (
-    <Page title={user.demo ? '記帳（試用）' : '記帳'} right={<button className="iconbtn" aria-label="設定" onClick={() => go('settings')}><Icon name="gear" /></button>}>
-      <div className="card hero">
-        <div>
-          <div className="label">{m} 月支出{data.settings.includeExceptions ? '' : '（不含例外）'}</div>
-          <div className="big num">{fmt(s.expense)}</div>
-        </div>
-        <div className="stats">
-          <div><span className="label">收入</span><b className="num income">{fmt(s.income)}</b></div>
-          <div><span className="label">結餘</span><b className={`num ${s.net < 0 ? 'expense' : ''}`}>{fmt(s.net)}</b></div>
-          <div><button className="link" style={{ padding: 0, textAlign: 'left' }} onClick={() => go('reports')}>看報表 ›</button></div>
-        </div>
+    <div className="card hero" style={{ gap: 6 }}>
+      <div className="row-flex">
+        <span className="label grow">淨資產{inc ? '（含股票）' : '（不含股票）'}</span>
+        <button className="chip" aria-pressed={inc} onClick={() => run(() => actions.updateSettings({ worthIncludeStocks: !inc }))} style={{ minHeight: 30, fontSize: 13 }}>
+          含股票
+        </button>
       </div>
-
-      {homeShowWorth && <button className="card hero" style={{ border: 0, textAlign: 'left', width: '100%' }} onClick={() => go('accounts')}>
-        <div className="row-flex">
-          <div className="grow">
-            <div className="label">淨資產</div>
-            <div className="num" style={{ fontSize: 26, fontWeight: 700 }}>{fmt(data.worth.total)}</div>
-            {stockTotal > 0 && <div className="small muted">含股票市值 {fmt(stockTotal)}</div>}
-            {data.worth.missingRate.length > 0 && <div className="small" style={{ color: 'var(--warn)' }}>{data.worth.missingRate.map((a) => a.currency).join('、')} 沒有匯率，暫時沒算進去</div>}
-          </div>
-          <Icon name="chev" className="chev" />
-        </div>
-      </button>}
-
-      <PendingList />
-      {homeShowTemplates && <TemplateBar />}
-
-      {Number(homeRecentCount) > 0 && <Section title="最近明細" action={<button className="link" onClick={() => go('transactions')}>全部</button>}>
-        {recent.length ? <TxnList txns={recent} dayTotals={false} /> : (
-          <div className="list"><Empty>還沒有紀錄。按下方 <b>＋</b> 記第一筆，或到「更多 › 從 CWMoney 匯入」。</Empty></div>
-        )}
-      </Section>}
-    </Page>
+      <button className="row-flex" style={{ border: 0, background: 'none', padding: 0, textAlign: 'left' }} onClick={() => go('accounts')}>
+        <span className={`num grow ${big ? 'big' : ''}`} style={big ? undefined : { fontSize: 26, fontWeight: 700 }}>{fmt(total)}</span>
+        {!big && <Icon name="chev" className="chev" />}
+      </button>
+      {inc && data.worthStocks > 0 && <div className="small muted">其中股票市值 {fmt(data.worthStocks)}</div>}
+      {data.worth.missingRate.length > 0 && <div className="small" style={{ color: 'var(--warn)' }}>{data.worth.missingRate.map((a) => a.currency).join('、')} 沒有匯率，暫時沒算進去</div>}
+    </div>
   );
 }
 
+const WD = ['週一', '週二', '週三', '週四', '週五', '週六', '週日'];
+/** 這天所在那一週（週一開始）的 7 天 */
+function weekOf(day) {
+  const d = parseYmd(day);
+  const back = (d.getDay() + 6) % 7;
+  return Array.from({ length: 7 }, (_, i) => addDays(day, i - back));
+}
+
+export default function Home() {
+  const { data, user } = useLedger();
+  const { openEntry } = useUI();
+  const today = todayStr();
+  const [day, setDay] = useState(today);
+  const touch = useRef(null);
+  const month = day.slice(0, 7);
+  const s = useMemo(() => summarize(data.transactions, data.accById, { ...monthRange(month), includeExceptions: data.settings.includeExceptions }), [data, month]);
+  const { homeShowWorth, homeShowTemplates } = data.settings;
+  const week = weekOf(day);
+  const byDay = useMemo(() => {
+    const m = new Map();
+    for (const t of data.transactions) { const k = localDate(t.occurred_at); if (!m.has(k)) m.set(k, []); m.get(k).push(t); }
+    return m;
+  }, [data.transactions]);
+  const dayTxns = byDay.get(day) ?? [];
+  let dayExp = 0; let dayInc = 0;
+  for (const t of dayTxns) {
+    if (!counts(t, data.accById, true)) continue;
+    if (t.type === 'expense') dayExp += twdOf(t); else dayInc += twdOf(t);
+  }
+  const shiftWeek = (n) => setDay(addDays(day, 7 * n));
+  const [y, m] = month.split('-').map(Number);
+
+  const add = () => openEntry(day === today ? {} : { initial: { type: 'expense', occurred_at: new Date(`${day}T12:00:00`).toISOString() } });
+
+  return (
+    <Page title={<>{y} 年 {m} 月{user.demo && <span className="small muted">（試用）</span>}</>} right={<>
+      <label className="iconbtn" aria-label="選日期" style={{ position: 'relative' }}>
+        <Icon name="calendar" />
+        <input type="date" value={day} onChange={(e) => e.target.value && setDay(e.target.value)} style={{ position: 'absolute', inset: 0, opacity: 0 }} aria-label="選日期" />
+      </label>
+      <button className="iconbtn" aria-label="設定" onClick={() => go('settings')}><Icon name="gear" /></button>
+    </>}>
+      <div className="card" style={{ padding: '10px 8px 14px', display: 'grid', gap: 12 }}
+        onTouchStart={(e) => { touch.current = e.touches[0].clientX; }}
+        onTouchEnd={(e) => { const dx = e.changedTouches[0].clientX - (touch.current ?? 0); if (Math.abs(dx) > 50) shiftWeek(dx < 0 ? 1 : -1); touch.current = null; }}>
+        <div className="week">
+          <button className="iconbtn" aria-label="上一週" onClick={() => shiftWeek(-1)}><Icon name="back" /></button>
+          {week.map((d, i) => (
+            <button key={d} className={`day ${d === today ? 'today' : ''} ${d > today ? 'future' : ''}`} aria-pressed={d === day} onClick={() => setDay(d)} aria-label={dayLabel(d)}>
+              <span className="wd">{WD[i]}</span>
+              <span className="dn">{Number(d.slice(8))}</span>
+              <span className="dot" style={{ visibility: byDay.has(d) ? 'visible' : 'hidden' }} />
+            </button>
+          ))}
+          <button className="iconbtn" aria-label="下一週" onClick={() => shiftWeek(1)}><Icon name="chev" /></button>
+        </div>
+        <div className="stats" style={{ padding: '0 8px' }}>
+          <div><span className="label small muted">{m} 月收入</span><b className="num income">{fmt(s.income)}</b></div>
+          <div><span className="label small muted">{m} 月支出</span><b className="num expense">{fmt(s.expense)}</b></div>
+          <div><span className="label small muted">結餘</span><b className={`num ${s.net < 0 ? 'expense' : ''}`}>{fmt(s.net)}</b></div>
+        </div>
+        {day !== today && <button className="link" style={{ justifySelf: 'center', padding: 0 }} onClick={() => setDay(today)}>回到今天</button>}
+      </div>
+
+      <button className="btn primary block" style={{ minHeight: 52, fontSize: 17 }} onClick={add}>
+        <Icon name="plus" className="chev" />記一筆{day !== today ? `（${dayLabel(day)}）` : ''}
+      </button>
+
+      <Section title={<>{dayLabel(day)}{day === today ? ' 今天' : ''}<span className="num" style={{ marginLeft: 'auto', fontWeight: 400 }}>
+        {dayExp > 0 && <span className="expense">支出 {fmt(dayExp)}</span>}{dayExp > 0 && dayInc > 0 && ' · '}{dayInc > 0 && <span className="income">收入 {fmt(dayInc)}</span>}
+      </span></>}>
+        {dayTxns.length
+          ? <div className="list">{dayTxns.map((t) => <TxnRow key={t.id} t={t} />)}</div>
+          : <div className="list"><Empty>{data.transactions.length ? '這天沒有紀錄' : <>還沒有紀錄。按上面的「記一筆」，或到「更多 › 從 CWMoney 匯入」。</>}</Empty></div>}
+      </Section>
+
+      <PendingList />
+      {homeShowTemplates && <TemplateBar />}
+      {homeShowWorth && <WorthCard />}
+    </Page>
+  );
+}

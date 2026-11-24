@@ -43,7 +43,7 @@ function niceTicks(min, max, count = 4) {
 // ---------------------------------------------------------------------
 // 圓環：rows = [{ id, name, total, drillable }]，超過 8 塊時第 8 塊起併成「其他」
 // ---------------------------------------------------------------------
-export function Donut({ rows, onPick, centerLabel = '合計' }) {
+export function Donut({ rows, onPick, onSelect, selected, centerLabel = '合計' }) {
   const [hover, setHover] = useState(null);
   const total = rows.reduce((s, r) => s + r.total, 0);
   let slices = rows;
@@ -98,12 +98,14 @@ export function Donut({ rows, onPick, centerLabel = '合計' }) {
                 <div className="row-flex"><span className="title grow">{s.name}</span><span className="num small">{fmt(s.total)}</span></div>
                 <div className="row-flex small muted"><div className="bar-track grow"><i style={{ width: `${share * 100}%`, background: s.color }} /></div><span className="num" style={{ width: '3.6em', textAlign: 'right' }}>{(share * 100).toFixed(1)}%</span></div>
               </div>
-              {s.drillable && <Icon name="chev" className="chev" />}
+              {(s.drillable || onSelect) && <Icon name="chev" className="chev" />}
             </>
           );
-          return s.drillable
-            ? <button key={s.id} className="item" style={{ padding: '8px 4px' }} onClick={() => onPick?.(s)} onPointerEnter={() => setHover(s.id)} onPointerLeave={() => setHover(null)}>{body}</button>
-            : <div key={s.id} className="item" style={{ padding: '8px 4px' }} onPointerEnter={() => setHover(s.id)} onPointerLeave={() => setHover(null)}>{body}</div>;
+          const click = s.drillable ? () => onPick?.(s) : onSelect ? () => onSelect(s) : null;
+          const style = { padding: '8px 4px', background: selected === s.id ? 'var(--surface-2)' : undefined };
+          return click
+            ? <button key={s.id} className="item" style={style} onClick={click} onPointerEnter={() => setHover(s.id)} onPointerLeave={() => setHover(null)}>{body}</button>
+            : <div key={s.id} className="item" style={style} onPointerEnter={() => setHover(s.id)} onPointerLeave={() => setHover(null)}>{body}</div>;
         })}
       </div>
     </div>
@@ -113,7 +115,7 @@ export function Donut({ rows, onPick, centerLabel = '合計' }) {
 // ---------------------------------------------------------------------
 // 每月收支：兩組長條（收入、支出），hover 顯示當月數字
 // ---------------------------------------------------------------------
-export function MonthBars({ data, height = 210 }) {
+export function MonthBars({ data, height = 210, onPick }) {
   const ref = useRef(null);
   const W = useWidth(ref);
   const [hi, setHi] = useState(null);
@@ -159,7 +161,7 @@ export function MonthBars({ data, height = 210 }) {
                   {(!narrow || i % 2 === (data.length - 1) % 2) && (
                     <text x={cx} y={height - 6} textAnchor="middle" fontSize="11" fill="var(--muted)">{Number(m.month.slice(5))}月</text>
                   )}
-                  <rect x={x0} y={0} width={band} height={height} fill="transparent" onPointerEnter={() => setHi(i)} onClick={() => setHi(i)} />
+                  <rect x={x0} y={0} width={band} height={height} fill="transparent" style={{ cursor: onPick ? 'pointer' : 'default' }} onPointerEnter={() => setHi(i)} onClick={() => { setHi(i); onPick?.(m.month); }} />
                 </g>
               );
             })}

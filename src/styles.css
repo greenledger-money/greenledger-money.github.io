@@ -112,6 +112,16 @@ button.item:active, a.item:active { background: var(--surface-2); }
 .stats > div { display: grid; gap: 2px; }
 .stats b { font-size: 17px; font-weight: 600; }
 .monthnav { display: flex; align-items: center; gap: 4px; }
+.week { display: grid; grid-template-columns: 30px repeat(7, minmax(0, 1fr)) 30px; align-items: center; }
+.week > .iconbtn { width: 30px; height: 44px; }
+.week > .iconbtn svg { width: 18px; height: 18px; }
+.day { border: 0; background: none; display: grid; justify-items: center; gap: 4px; padding: 4px 0; color: var(--ink); }
+.day .wd { font-size: 12px; color: var(--muted); }
+.day .dn { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.day.today .dn { color: var(--accent); }
+.day.future .dn { color: var(--muted); font-weight: 500; }
+.day[aria-pressed=true] .dn { background: var(--accent); color: var(--accent-ink); }
+.day .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .monthnav b { font-size: 15px; min-width: 7.5em; text-align: center; }
 
 /* ---------- 按鈕與輸入 ---------- */

@@ -4,6 +4,7 @@ import { useLedger } from '../store.jsx';
 import { Empty, Field, Icon, Item, MoveButtons, Money, Page, Section, Seg, Sheet, Toggle, back, go, useAction, useUI } from '../ui/kit.jsx';
 import { TxnList } from '../ui/TxnList.jsx';
 import { BrokerageView } from './Stocks.jsx';
+import { WorthCard } from './Home.jsx';
 import { ACCOUNT_TYPES, accountTypeLabel } from '../lib/ledger.js';
 import { CURRENCIES, fmt } from '../lib/money.js';
 
@@ -91,9 +92,7 @@ export default function Accounts() {
       {!sorting && <button className="iconbtn" aria-label="新增帳戶" onClick={() => setEdit({})}><Icon name="plus" /></button>}
     </>}>
       {sorting && <div className="notice">用 ↑ ↓ 調整同一類帳戶的順序，記帳選帳戶時也會照這個順序。</div>}
-      <div className="card hero">
-        <div><div className="label">淨資產（含股票市值）</div><div className="big num">{fmt(data.worth.total)}</div></div>
-      </div>
+      <WorthCard big />
       {ACCOUNT_TYPES.map((t) => {
         const list = visible.filter((a) => a.type === t.value);
         if (!list.length) return null;

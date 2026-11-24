@@ -2,8 +2,9 @@
 import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
 import { Icon, Page, Section, Seg, Toggle } from '../ui/kit.jsx';
+import { TxnList } from '../ui/TxnList.jsx';
 import { Donut, LineChart, MonthBars } from '../ui/charts.jsx';
-import { categoryBreakdown, monthlyTrend, netWorthSeries, summarize } from '../lib/ledger.js';
+import { categoryBreakdown, counts, monthlyTrend, netWorthSeries, summarize, twdOf } from '../lib/ledger.js';
 import { fmt } from '../lib/money.js';
 import { lastMonths, monthLabel, monthRange, shiftMonth, thisMonth } from '../lib/dates.js';
 
@@ -14,7 +15,9 @@ export default function Reports() {
   const [year, setYear] = useState(Number(thisMonth().slice(0, 4)));
   const [kind, setKind] = useState('expense');
   const [incl, setIncl] = useState(data.settings.includeExceptions);
-  const [parentId, setParentId] = useState(null);
+  const [parentId, setParentIdRaw] = useState(null);
+  const [leaf, setLeaf] = useState(null); // 點了最底層的分類 → 看它的明細
+  const setParentId = (v) => { setParentIdRaw(v); setLeaf(null); };
 
   const range = period === 'month' ? monthRange(month) : { from: new Date(year, 0, 1), to: new Date(year + 1, 0, 1) };
   const label = period === 'month' ? monthLabel(month) : `${year} 年`;
@@ -25,6 +28,17 @@ export default function Reports() {
   const trend = useMemo(() => monthlyTrend(data.transactions, data.accById, months, incl), [data, incl]);
   const worth = useMemo(() => netWorthSeries({ accounts: data.accounts, txns: data.worthTxns, monthKeys: months, fx: data.fx, stockValueAt: data.stockValueAt }), [data]);
   const crumbs = parentId ? data.tree.chain(parentId) : [];
+  // 明細：點了最底層分類就看它；有往下鑽就看整個上層分類
+  const focus = leaf ?? parentId;
+  const detail = useMemo(() => {
+    if (!focus) return [];
+    const set = focus === '__self' ? new Set([parentId]) : data.tree.descendants(focus);
+    const lo = range.from.getTime(); const hi = range.to.getTime();
+    return data.transactions.filter((t) => t.type === kind && set.has(t.category_id) && counts(t, data.accById, incl)
+      && Date.parse(t.occurred_at) >= lo && Date.parse(t.occurred_at) < hi);
+  }, [data, focus, parentId, kind, range.from.getTime(), incl]);
+  const detailName = focus === '__self' ? `${data.tree.path(parentId)}（未細分）` : focus ? data.tree.path(focus) : '';
+  const detailTotal = detail.reduce((x, t) => x + twdOf(t), 0);
 
   const shift = (n) => { setParentId(null); if (period === 'month') setMonth(shiftMonth(month, n)); else setYear(year + n); };
 
@@ -57,13 +71,21 @@ export default function Reports() {
               {crumbs.map((c) => <span key={c.id} className="row-flex">› <button onClick={() => setParentId(c.id)}>{c.name}</button></span>)}
             </div>
           )}
-          <Donut rows={rows} onPick={(r) => setParentId(r.id)} centerLabel={parentId ? data.tree.byId.get(parentId)?.name : kind === 'expense' ? '總支出' : '總收入'} />
-          <p className="small muted" style={{ margin: 0 }}>點有 › 的分類可以看下一層。隱藏帳戶的收支不算；外幣都換成台幣。</p>
+          <Donut rows={rows} onPick={(r) => setParentId(r.id)} onSelect={(r) => { if (r.id !== '__unknown' && r.id !== '__other') { setLeaf(r.id); setTimeout(() => document.getElementById('report-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); } }} selected={leaf}
+            centerLabel={parentId ? data.tree.byId.get(parentId)?.name : kind === 'expense' ? '總支出' : '總收入'} />
+          <p className="small muted" style={{ margin: 0 }}>點分類往下一層，最底層就列出每一筆。隱藏帳戶的收支不算；外幣都換成台幣。</p>
         </div>
       </Section>
 
-      <Section title="每月收支（近 12 個月）">
-        <div className="card"><MonthBars data={trend} /></div>
+      {focus && (
+        <div id="report-detail" style={{ scrollMarginTop: 12 }}><Section title={<>明細：{detailName}<span className="num" style={{ marginLeft: 'auto', fontWeight: 400 }}>{detail.length} 筆 · {fmt(detailTotal)}</span></>}
+          action={leaf ? <button className="link" onClick={() => setLeaf(null)}>收起</button> : null}>
+          <TxnList txns={detail} empty="這段期間沒有紀錄" />
+        </Section></div>
+      )}
+
+      <Section title="每月收支（近 12 個月，點長條看那個月）">
+        <div className="card"><MonthBars data={trend} onPick={(k) => { setPeriod('month'); setMonth(k); setParentId(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /></div>
       </Section>
 
       <Section title="淨資產走勢（每月月底）">

@@ -190,13 +190,15 @@ export function LedgerProvider({ backend, user, children }) {
     const worthBalances = computeBalances(accounts, worthTxns.filter((t) => Date.parse(t.occurred_at) <= Date.now() || (tradeDateOf.get(t.id) ?? '9999') <= today), null);
     const unsettled = new Map(accounts.map((a) => [a.id, Math.round((worthBalances.get(a.id) - balances.get(a.id)) * 100) / 100]).filter(([, v]) => v !== 0));
     const worth = netWorth({ accounts, balances: worthBalances, fx, stockValue });
+    const worthStocks = worth.rows.filter((r) => r.account.type === 'brokerage').reduce((x, r) => x + r.twd, 0);
+    const worthNoStocks = Math.round((worth.total - worthStocks) * 100) / 100;
     const stockValueAt = (date) => stockValueByAccount(valuePositions(runFifo(tables.stock_trades, { until: date }), priceBook, fx, date));
     const settings = { ...DEFAULT_SETTINGS, ...(tables.profiles[0]?.settings ?? {}) };
     const pending = tables.pending_items.filter((p) => p.status === 'pending').sort((a, b) => a.due_date.localeCompare(b.due_date));
     const txns = [...tables.transactions].sort((a, b) => Date.parse(b.occurred_at) - Date.parse(a.occurred_at));
     return {
       ...tables, transactions: txns, accounts, accById, tree, fx, priceBook, balances, positions, holdings,
-      stockValue, worth, stockValueAt, settings, pending, unsettled, worthTxns,
+      stockValue, worth, worthStocks, worthNoStocks, stockValueAt, settings, pending, unsettled, worthTxns,
       friendsOwe: accounts.find((a) => a.system_key === 'friends_owe'),
       feeCat: tree.bySystemKey('fee'), dividendCat: tree.bySystemKey('dividend'),
       rateFor: (currency, date) => fx.rateOn(currency, date),
