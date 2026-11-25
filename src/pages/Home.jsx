@@ -144,7 +144,9 @@ function weekOf(day) {
 }
 
 export default function Home() {
-  const { data, user } = useLedger();
+  const { data, user, actions } = useLedger();
+  const [run] = useAction();
+  const incExc = data.settings.includeExceptions !== false;
   const { openEntry } = useUI();
   const today = todayStr();
   const [day, setDay] = useState(today);
@@ -191,6 +193,12 @@ export default function Home() {
             </button>
           ))}
           <button className="iconbtn" aria-label="下一週" onClick={() => shiftWeek(1)}><Icon name="chev" /></button>
+        </div>
+        <div className="row-flex" style={{ padding: '0 8px' }}>
+          <span className="label small muted grow">{m} 月收支{incExc ? '（含例外）' : '（不含例外）'}</span>
+          <button className="chip" aria-pressed={incExc} onClick={() => run(() => actions.updateSettings({ includeExceptions: !incExc }))} style={{ minHeight: 30, fontSize: 13 }}>
+            含例外
+          </button>
         </div>
         <div className="stats" style={{ padding: '0 8px' }}>
           <div className="stat"><Tile name="arrowDown" tone="solid income" round size={26} /><span className="label small muted">{m} 月收入</span><b className="num income">{fmt(s.income)}</b></div>
