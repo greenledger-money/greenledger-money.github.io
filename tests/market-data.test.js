@@ -48,13 +48,13 @@ describe('股價、匯率解析', () => {
 
 test('美股：Stooq CSV', () => {
   expect(parseStooqCsv('Symbol,Date,Time,Close\r\nSOXX.US,2026-11-24,22:00:09,265.31\r\n'))
-    .toEqual({ market: 'US', symbol: 'SOXX', price_date: '2026-11-24', close: 265.31, name: null });
+    .toEqual({ market: 'US', symbol: 'SOXX', price_date: '2026-11-24', close: 265.31, name: '' });
   expect(parseStooqCsv('Symbol,Date,Time,Close\nXXXX.US,N/D,N/D,N/D\n')).toBeNull();
   expect(parseStooqCsv('')).toBeNull();
 });
 
 test('美股：Yahoo chart 取最後一個有收盤價的交易日（紐約日期）', () => {
   const json = { chart: { result: [{ timestamp: [1763994600, 1764081000], indicators: { quote: [{ close: [100.123456, null] }] } }] } };
-  expect(parseYahooChart(json, 'tsm')).toEqual({ market: 'US', symbol: 'TSM', price_date: '2025-11-24', close: 100.1235, name: null });
+  expect(parseYahooChart(json, 'tsm')).toEqual({ market: 'US', symbol: 'TSM', price_date: '2025-11-24', close: 100.1235, name: '' });
   expect(parseYahooChart({ chart: { result: null } }, 'TSM')).toBeNull();
 });

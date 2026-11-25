@@ -83,7 +83,7 @@ export function parseStooqCsv(text) {
   const [sym, date, , close] = lines[1].split(',').map((x) => x.trim());
   const c = Number(close);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !(c > 0)) return null; // 查不到時是 N/D
-  return { market: 'US', symbol: sym.replace(/\.US$/i, '').toUpperCase(), price_date: date, close: c, name: null };
+  return { market: 'US', symbol: sym.replace(/\.US$/i, '').toUpperCase(), price_date: date, close: c, name: '' };
 }
 
 /** Yahoo chart JSON → 最後一個有收盤價的交易日（日期用紐約時間） */
@@ -95,7 +95,7 @@ export function parseYahooChart(json, symbol) {
     const c = Number(closes[i]);
     if (!(c > 0)) continue;
     const price_date = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ts[i] * 1000));
-    return { market: 'US', symbol: symbol.toUpperCase(), price_date, close: Math.round(c * 10000) / 10000, name: null };
+    return { market: 'US', symbol: symbol.toUpperCase(), price_date, close: Math.round(c * 10000) / 10000, name: '' };
   }
   return null;
 }
