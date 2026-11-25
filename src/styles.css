@@ -247,8 +247,6 @@ textarea.input { min-height: 72px; resize: vertical; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .crumbs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 14px; }
 .crumbs button { border: 0; background: none; color: var(--accent); font-weight: 600; padding: 4px 2px; }
-.donut-wrap { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 16px; align-items: center; }
-@media (max-width: 520px) { .donut-wrap { grid-template-columns: minmax(0, 1fr); justify-items: center; } .donut-wrap > .list { width: 100%; } }
 .bar-track { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; margin-top: 4px; }
 .bar-track > i { display: block; height: 100%; border-radius: 3px; }
 
@@ -359,3 +357,21 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .enote { min-height: 96px; resize: none; font-size: 16px; line-height: 1.5; }
 .erow { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 14px; background: var(--surface); border-radius: 12px; }
 .adv-toggle { display: flex; justify-content: space-between; align-items: center; border: 0; background: none; padding: 4px 2px; font-size: 15px; font-weight: 700; color: var(--ink-2); }
+
+/* ---------- 報表：圓環＋清單（像 CWMoney） ---------- */
+.donut-wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.donut-fig { width: 100%; max-width: 380px; height: auto; justify-self: center; overflow: visible; }
+.dlist { display: grid; width: 100%; }
+.drow { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 6px 4px; border: 0; background: none; text-align: left; color: var(--ink); border-radius: 12px; width: 100%; }
+.drow.sel, .drow:active { background: var(--surface-2); }
+.drow .title { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dbar { width: 6px; height: 34px; border-radius: 3px; flex: none; }
+.dval { display: grid; justify-items: end; line-height: 1.25; }
+.dval b { font-size: 17px; }
+.dval b.expense { color: var(--expense); } .dval b.income { color: var(--income); }
+.utabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border-bottom: 1px solid var(--line); }
+.utabs button { border: 0; background: none; padding: 10px 0; font-size: 17px; font-weight: 700; color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -1px; }
+.utabs button[aria-selected=true] { color: var(--ink); border-bottom-color: var(--accent); }
+.pillrow { display: flex; gap: 10px; }
+.pill { border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); border-radius: 999px; padding: 8px 18px; font-size: 15px; font-weight: 700; }
+.pill[aria-pressed=true] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }

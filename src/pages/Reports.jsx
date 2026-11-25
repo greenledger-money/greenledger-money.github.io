@@ -1,7 +1,7 @@
 // 報表：分類占比圓環 → 點分類進那個分類的頁面 → 點最底層看每一筆（像 CWMoney）
 import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
-import { Icon, Page, Section, Seg, back, go } from '../ui/kit.jsx';
+import { Icon, Page, Section, Seg, back, categoryIcon, go } from '../ui/kit.jsx';
 import { TxnList } from '../ui/TxnList.jsx';
 import { Donut, LineChart, MonthBars } from '../ui/charts.jsx';
 import { categoryBreakdown, counts, monthlyTrend, netWorthSeries, summarize, twdOf } from '../lib/ledger.js';
@@ -9,7 +9,7 @@ import { fmt } from '../lib/money.js';
 import { lastMonths, monthLabel, monthRange, shiftMonth, thisMonth } from '../lib/dates.js';
 
 // 報表的期間、收支、含例外：在報表和點進去的頁面之間共用（換頁不會跑掉）
-const RS = { period: null, month: thisMonth(), year: Number(thisMonth().slice(0, 4)), kind: 'expense', incl: null };
+const RS = { view: 'cat', period: null, month: thisMonth(), year: Number(thisMonth().slice(0, 4)), kind: 'expense', incl: null };
 function useReportState() {
   const { data } = useLedger();
   const [, force] = useState(0);
@@ -58,37 +58,50 @@ export default function Reports() {
   const trend = useMemo(() => monthlyTrend(data.transactions, data.accById, months, incl), [data, incl]);
   const worth = useMemo(() => netWorthSeries({ accounts: data.accounts, txns: data.worthTxns, monthKeys: months, fx: data.fx, stockValueAt: data.stockValueAt }), [data]);
 
+  const iconOf = (r) => (data.tree.byId.get(r.id) ? categoryIcon(data.tree, r.id) : 'tag');
+
   return (
     <Page title="報表">
-      <Seg value={rs.period} onChange={(v) => set({ period: v })} options={[{ value: 'month', label: '月' }, { value: 'year', label: '年' }]} />
-      <PeriodBar rs={rs} set={set} label={label} />
-      <ExceptionBar rs={rs} set={set} />
+      <Seg value={rs.view} onChange={(v) => set({ view: v })} options={[{ value: 'cat', label: '分類報表' }, { value: 'trend', label: '收支趨勢' }]} />
 
-      <div className="card">
-        <div className="stats">
-          <div><span className="small muted">收入</span><b className="num income">{fmt(s.income)}</b></div>
-          <div><span className="small muted">支出</span><b className="num expense">{fmt(s.expense)}</b></div>
-          <div><span className="small muted">結餘</span><b className={`num ${s.net < 0 ? 'expense' : ''}`}>{fmt(s.net)}</b></div>
-        </div>
-      </div>
-
-      <Section title="分類占比">
-        <div className="card" style={{ display: 'grid', gap: 12 }}>
-          <Seg value={kind} onChange={(v) => set({ kind: v })} options={[{ value: 'expense', label: '支出' }, { value: 'income', label: '收入' }]} />
-          <Donut rows={rows} onPick={(r) => openRow(r)} onSelect={(r) => openRow(r)} centerLabel={kind === 'expense' ? '總支出' : '總收入'} />
-        </div>
-      </Section>
-
-      <Section title="近 12 個月">
-        <div className="card"><MonthBars data={trend} onPick={(k) => { set({ period: 'month', month: k }); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /></div>
-      </Section>
-
-      <Section title="淨資產走勢">
-        <div className="card">
-          <LineChart data={worth} />
-          <p className="small muted" style={{ margin: '8px 0 0' }}>每月月底，含股票市值</p>
-        </div>
-      </Section>
+      {rs.view === 'cat' ? (
+        <>
+          <div className="utabs" role="tablist">
+            {[['expense', '支出'], ['income', '收入']].map(([v, l]) => <button key={v} type="button" role="tab" aria-selected={kind === v} onClick={() => set({ kind: v })}>{l}</button>)}
+          </div>
+          <div className="pillrow">
+            <button type="button" className="pill" aria-pressed={rs.period === 'month'} onClick={() => set({ period: 'month' })}>月分類</button>
+            <button type="button" className="pill" aria-pressed={rs.period === 'year'} onClick={() => set({ period: 'year' })}>年分類</button>
+          </div>
+          <PeriodBar rs={rs} set={set} label={label} />
+          <ExceptionBar rs={rs} set={set} />
+          <div className="card">
+            <Donut rows={rows} kind={kind} iconOf={iconOf} onPick={(r) => openRow(r)} onSelect={(r) => openRow(r)} centerLabel={kind === 'expense' ? '總支出' : '總收入'} />
+          </div>
+        </>
+      ) : (
+        <>
+          <Seg value={rs.period} onChange={(v) => set({ period: v })} options={[{ value: 'month', label: '月' }, { value: 'year', label: '年' }]} />
+          <PeriodBar rs={rs} set={set} label={label} />
+          <ExceptionBar rs={rs} set={set} />
+          <div className="card">
+            <div className="stats">
+              <div><span className="small muted">收入</span><b className="num income">{fmt(s.income)}</b></div>
+              <div><span className="small muted">支出</span><b className="num expense">{fmt(s.expense)}</b></div>
+              <div><span className="small muted">結餘</span><b className={`num ${s.net < 0 ? 'expense' : ''}`}>{fmt(s.net)}</b></div>
+            </div>
+          </div>
+          <Section title="近 12 個月">
+            <div className="card"><MonthBars data={trend} onPick={(k) => { set({ period: 'month', month: k, view: 'cat' }); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /></div>
+          </Section>
+          <Section title="淨資產走勢">
+            <div className="card">
+              <LineChart data={worth} />
+              <p className="small muted" style={{ margin: '8px 0 0' }}>每月月底，含股票市值</p>
+            </div>
+          </Section>
+        </>
+      )}
     </Page>
   );
 }
@@ -109,7 +122,7 @@ export function ReportCategory({ id }) {
       <ExceptionBar rs={rs} set={set} />
       <div className="card" style={{ display: 'grid', gap: 12 }}>
         {rows.length
-          ? <Donut rows={rows} onPick={(r) => openRow(r, id)} onSelect={(r) => openRow(r, id)} centerLabel={kind === 'expense' ? '總支出' : '總收入'} />
+          ? <Donut rows={rows} kind={kind} iconOf={(r) => categoryIcon(data.tree, r.id === '__self' ? id : r.id)} onPick={(r) => openRow(r, id)} onSelect={(r) => openRow(r, id)} centerLabel={kind === 'expense' ? '總支出' : '總收入'} />
           : <div className="empty">這段期間沒有紀錄</div>}
       </div>
       {total > 0 && <button className="btn block" onClick={() => go('rtx', id)}>看「{node.name}」全部 {fmt(total)} 的明細</button>}
