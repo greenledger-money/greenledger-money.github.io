@@ -12,6 +12,8 @@ export const DEFAULT_SETTINGS = {
   // 首頁
   homeShowWorth: true,
   homeShowTemplates: true,
+  homeShowBudget: true,      // 首頁顯示預算卡
+  budget: { total: 0, exception: 0, categories: {} },  // 每月預算
   worthIncludeStocks: true,  // 淨資產要不要算股票市值
   accountTypeOrder: [],      // 帳戶類別（銀行、信用卡…）的順序
   // 報表

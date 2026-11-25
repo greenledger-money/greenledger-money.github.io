@@ -1,4 +1,5 @@
 // App 外框：決定用哪個後端（Supabase 或試用模式）、登入狀態、頁面切換、底部分頁列
+import Budget from './pages/Budget.jsx';
 import { useEffect, useMemo, useState } from 'react';
 import { LedgerProvider, useLedger } from './store.jsx';
 import { Icon, UIProvider, go, useRoute } from './ui/kit.jsx';
@@ -41,7 +42,7 @@ const TABS = [
   { name: 'reports', label: '報表', icon: 'chart' },
   { name: 'more', label: '更多', icon: 'more' },
 ];
-const TAB_OF = { rcat: 'reports', rtx: 'reports', account: 'accounts', transactions: 'more', stocks: 'more', stock: 'more', templates: 'more', recurring: 'more', categories: 'more', import: 'more', export: 'more', settings: 'more', privacy: 'more' };
+const TAB_OF = { budget: 'more', rcat: 'reports', rtx: 'reports', account: 'accounts', transactions: 'more', stocks: 'more', stock: 'more', templates: 'more', recurring: 'more', categories: 'more', import: 'more', export: 'more', settings: 'more', privacy: 'more' };
 
 function Shell({ openEntry }) {
   const { status, data, actions, backend } = useLedger();
@@ -70,6 +71,7 @@ function Shell({ openEntry }) {
     case 'rcat': page = <ReportCategory id={route.arg} key={route.arg} />; break;
     case 'rtx': page = <ReportTxns id={route.arg} key={route.arg} />; break;
     case 'more': page = <More />; break;
+    case 'budget': page = <Budget />; break;
     case 'stocks': page = <Stocks />; break;
     case 'stock': page = <StockDetail id={route.arg} key={route.arg} />; break;
     case 'templates': page = <Templates />; break;

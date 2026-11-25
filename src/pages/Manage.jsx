@@ -12,6 +12,7 @@ export function More() {
   const { data, user } = useLedger();
   const links = [
     ['transactions', 'doc', '明細', '按月份查詢、搜尋備註'],
+    ['budget', 'wallet', '預算', data.settings.budget?.total ? `每月 ${Number(data.settings.budget.total).toLocaleString()}` : '每月一般支出、例外各一個額度'],
     ['stocks', 'stock', '股票', `${data.holdings.length} 檔持股`],
     ['templates', 'bolt', '範本', `${data.templates.length} 個`],
     ['recurring', 'repeat', '固定收支', `${data.recurring_rules.filter((r) => r.active).length} 個進行中`],

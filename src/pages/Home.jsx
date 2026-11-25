@@ -1,4 +1,5 @@
 // 首頁：本月收支與結餘、淨資產（含股票市值）、待確認清單、範本、最近明細
+import { BudgetCard } from './Budget.jsx';
 import { useMemo, useRef, useState } from 'react';
 import { useLedger } from '../store.jsx';
 import { Empty, Icon, Money, Page, Section, Tile, go, useAction, useUI } from '../ui/kit.jsx';
@@ -135,7 +136,7 @@ export default function Home() {
   const touch = useRef(null);
   const month = day.slice(0, 7);
   const s = useMemo(() => summarize(data.transactions, data.accById, { ...monthRange(month), includeExceptions: data.settings.includeExceptions }), [data, month]);
-  const { homeShowWorth, homeShowTemplates } = data.settings;
+  const { homeShowWorth, homeShowTemplates, homeShowBudget } = data.settings;
   const week = weekOf(day);
   const byDay = useMemo(() => {
     const m = new Map();
@@ -183,6 +184,8 @@ export default function Home() {
         </div>
         {day !== today && <button className="link" style={{ justifySelf: 'center', padding: 0 }} onClick={() => setDay(today)}>回到今天</button>}
       </div>
+
+      {homeShowBudget && <BudgetCard month={month} />}
 
       <button className="btn primary block" style={{ minHeight: 52, fontSize: 17 }} onClick={add}>
         <Icon name="plus" className="chev" />記一筆{day !== today ? `（${dayLabel(day)}）` : ''}

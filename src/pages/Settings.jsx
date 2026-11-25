@@ -176,6 +176,7 @@ export function Settings() {
         <div className="card form">
           <Switch label="顯示淨資產" checked={s.homeShowWorth} onChange={(v) => upd({ homeShowWorth: v })} />
           <Switch label="顯示範本按鈕" checked={s.homeShowTemplates} onChange={(v) => upd({ homeShowTemplates: v })} />
+          <Switch label="顯示預算" hint="預算到「更多 › 預算」設定" checked={s.homeShowBudget} onChange={(v) => upd({ homeShowBudget: v })} />
           <Switch label="淨資產含股票市值" hint="首頁和帳戶頁的淨資產卡上也可以直接切換" checked={s.worthIncludeStocks} onChange={(v) => upd({ worthIncludeStocks: v })} />
         </div>
       </Section>
