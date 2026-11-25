@@ -146,7 +146,7 @@ export function netWorth({ accounts, balances, fx, stockValue }) {
  * 用帳上金額（轉進去的錢＝成本）代替，不然以前的月份會像是錢憑空不見。
  * stockStart: Map(證券戶 id → 第一筆股票紀錄日期)
  */
-export function netWorthSeries({ accounts, txns, monthKeys, fx, stockValueAt, now = new Date(), includeStocks = true, stockStart = new Map() }) {
+export function netWorthSeries({ accounts, txns, monthKeys, fx, stockValueAt, now = new Date(), includeStocks = true, stockStart = null }) {
   const visible = accounts.filter((a) => !a.hidden);
   const bal = new Map(accounts.map((a) => [a.id, Number(a.opening_balance) || 0]));
   const sorted = [...txns].sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at));
@@ -164,8 +164,8 @@ export function netWorthSeries({ accounts, txns, monthKeys, fx, stockValueAt, no
     for (const a of visible) {
       if (a.type === 'brokerage') {
         if (!includeStocks) continue;
-        const start = stockStart.get(a.id);
-        if (start && endDay >= start) { total += stock.get(a.id)?.twd ?? 0; continue; }
+        const start = stockStart ? stockStart.get(a.id) : '';  // 沒給 stockStart：一律用市值
+        if (start != null && endDay >= start) { total += stock.get(a.id)?.twd ?? 0; continue; }
       }
       const rate = fx.rateOn(a.currency, endDay) ?? fx.latest(a.currency) ?? 0;
       total += bal.get(a.id) * rate;
