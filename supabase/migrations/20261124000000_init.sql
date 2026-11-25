@@ -136,7 +136,7 @@ create table public.transactions (
   parent_id       uuid,      -- 轉帳手續費那筆支出 → 指向原本的轉帳（刪轉帳時一起刪）
   group_id        uuid,      -- 分帳：同一次分帳的「支出」與「轉進朋友欠我」共用
   source          text not null default 'manual'
-                  check (source in ('manual','template','recurring','split','stock','dividend','cw_import')),
+                  check (source in ('manual','template','recurring','split','stock','dividend','cw_import','email','shortcut','1sec_import')),
   pending_item_id uuid unique,   -- 從待確認清單確認來的；unique ＝ 同一筆不能確認兩次
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
