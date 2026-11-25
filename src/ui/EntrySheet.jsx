@@ -1,5 +1,5 @@
 // 記一筆（新增／修改）：支出、收入、轉帳；內建計算機鍵盤；分帳；轉帳手續費；外幣自動帶匯率
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLedger, remember } from '../store.jsx';
 import { Icon, Sheet, Tile, Toggle, accountIcon, categoryIcon, useAction, useUI } from './kit.jsx';
 import { AccountSelect, CategoryPicker } from './pickers.jsx';
@@ -88,6 +88,7 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
   const [tplName, setTplName] = useState(null);
   const [tab, setTab] = useState(src.type ?? 'expense');
   const [advanced, setAdvanced] = useState(false);
+  const advRef = useRef(null);
   const [pickCat, setPickCat] = useState(false);
 
   const acc = accById.get(accountId);
@@ -116,6 +117,9 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
     const r1 = Number(fxRate); const r2 = Number(toFxRate);
     setEx((e) => ({ ...e, to_amount: amount != null && r1 > 0 && r2 > 0 ? String(round2(amount * r1 / r2)) : '' }));
   }, [amount, fxRate, toFxRate, crossCurrency, type, manual.toAmount]);
+
+  // 打開進階設定後捲到看得到的位置（內容在最下面，不捲的話會以為沒打開）
+  useEffect(() => { if (advanced) advRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [advanced]);
 
   // 交換轉出、轉入；跨幣別時金額也一起對調
   const swapAccounts = () => {
@@ -212,6 +216,12 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
   const balanceOf = (a) => (a ? fmt(data.balances.get(a.id), a.currency, { exact: true }) : '');
   const canTemplate = !original && !initial.pending_item_id;
   const showAdvanced = advanced || split || (tplName != null);
+  // 計算機開著時，進階設定會長在鍵盤底下被蓋住：打開時先把鍵盤收起來（等於按 OK）
+  const toggleAdvanced = () => {
+    const open = !showAdvanced;
+    if (open && active) finishKeypad();
+    setAdvanced(open);
+  };
   const toAmountShown = crossCurrency ? evaluate(ex.to_amount) : amount;
 
   const applyTemplate = (t) => {
@@ -324,11 +334,11 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
             <div className="erow"><span className="grow">例外<span className="small muted">　不規律的大額支出</span></span><Toggle label="例外" checked={isException} onChange={setIsException} /></div>
           )}
 
-          <button type="button" className="adv-toggle" aria-expanded={showAdvanced} onClick={() => setAdvanced(!showAdvanced)}>
+          <button type="button" className="adv-toggle" aria-expanded={showAdvanced} onClick={toggleAdvanced}>
             <span>進階設定</span><Icon name="chev" className={`chev ${showAdvanced ? 'up' : 'down'}`} />
           </button>
           {showAdvanced && (
-            <div className="formlist">
+            <div className="formlist" ref={advRef}>
               {type === 'expense' && !original && !initial.pending_item_id && (
                 <div className="frow"><span className="lbl">分帳</span><span className="grow small muted">代墊，朋友之後還款</span><Toggle label="分帳" checked={split} onChange={(v) => { setSplit(v); if (v) setActive('mine'); }} /></div>
               )}
