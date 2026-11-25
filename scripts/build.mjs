@@ -48,9 +48,9 @@ await mkdir(r('dist-demo'), { recursive: true });
 const jsText = (await readFile(r('dist', js), 'utf8')).replace(/<\/script/gi, '<\\/script');
 const cssText = css ? await readFile(r('dist', css), 'utf8') : '';
 const demo = tpl
-  .replace('<script src="config.js"></script>', '<script>window.APP_CONFIG={appName:"記帳",demoOnly:true}</script>')
+  .replace('<script src="config.js"></script>', '<script>window.APP_CONFIG={appName:"小綠記帳",demoOnly:true}</script>')
   .replace(/<link rel="(manifest|icon|apple-touch-icon)"[^>]*>\n?\s*/g, '')
-  .replace('<title>記帳</title>', '<title>記帳 App 試用</title>')
+  .replace('<title>小綠記帳</title>', '<title>小綠記帳（試用）</title>')
   .replace('<!--APP_CSS-->', `<style>${cssText}</style>`)
   .replace('<!--APP_JS-->', `<script type="module">${jsText}</script>`);
 await writeFile(r('dist-demo/index.html'), demo);

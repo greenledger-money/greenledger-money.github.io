@@ -31,7 +31,7 @@ jobs:
           SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
         run: |
           node -e "
-            const c = { appName: process.env.APP_NAME || '記帳', supabaseUrl: process.env.SUPABASE_URL || '', supabasePublishableKey: process.env.SUPABASE_PUBLISHABLE_KEY || '' };
+            const c = { appName: process.env.APP_NAME || '小綠記帳', supabaseUrl: process.env.SUPABASE_URL || '', supabasePublishableKey: process.env.SUPABASE_PUBLISHABLE_KEY || '' };
             if (/^sb_secret_|service_role/.test(c.supabasePublishableKey)) { console.error('SUPABASE_PUBLISHABLE_KEY 放到 secret key 了！'); process.exit(1); }
             require('fs').writeFileSync('dist/config.js', 'window.APP_CONFIG = ' + JSON.stringify(c, null, 2) + ';\n');
           "

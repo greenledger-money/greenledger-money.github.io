@@ -1,7 +1,7 @@
 {
-  "name": "記帳",
-  "short_name": "記帳",
-  "description": "免費、多人可用的記帳網頁 app",
+  "name": "小綠記帳",
+  "short_name": "小綠記帳",
+  "description": "收支、帳戶、股票，一次看清楚。",
   "lang": "zh-Hant-TW",
   "start_url": "./",
   "scope": "./",

@@ -3,7 +3,7 @@
 const cfg = (typeof window !== 'undefined' && window.APP_CONFIG) || {};
 
 export const APP = {
-  name: cfg.appName || '記帳',
+  name: cfg.appName || '小綠記帳',
   version: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev',
   demoOnly: !!cfg.demoOnly,
 };
