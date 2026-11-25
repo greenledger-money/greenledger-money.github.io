@@ -103,6 +103,16 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
     setEx((e) => ({ ...e, to_amount: amount != null && r1 > 0 && r2 > 0 ? String(round2(amount * r1 / r2)) : '' }));
   }, [amount, fxRate, toFxRate, crossCurrency, type, manual.toAmount]);
 
+  // 交換轉出、轉入；跨幣別時金額也一起對調
+  const swapAccounts = () => {
+    if (!toAccountId) return;
+    const from = accountId;
+    setAccountId(toAccountId); setToAccountId(from);
+    if (crossCurrency) setEx((e) => ({ ...e, amount: e.to_amount, to_amount: e.amount }));
+    setManual((m) => ({ ...m, fx: false, toFx: false }));
+    setError('');
+  };
+
   const onKey = (k) => {
     setError('');
     setEx((e) => ({ ...e, [active]: press(e[active], k) }));
@@ -206,7 +216,12 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
         </div>
         {type === 'transfer' && (
           <div className="frow">
-            <label htmlFor="to">轉入</label>
+            <span className="lbl swap-lbl">
+              <label htmlFor="to">轉入</label>
+              <button type="button" className="swapbtn" onClick={swapAccounts} disabled={!toAccountId} aria-label="交換轉出和轉入帳戶" title="交換轉出、轉入">
+                <Icon name="swapV" />
+              </button>
+            </span>
             <div className="ctrl"><AccountSelect id="to" className="" value={toAccountId} placeholder="選擇轉入帳戶" filter={(a) => a.id !== accountId} onChange={(v) => { setToAccountId(v); setManual((m) => ({ ...m, toFx: false, toAmount: false })); }} /></div>
           </div>
         )}

@@ -56,6 +56,7 @@ const PATHS = {
   people: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-6 9a6 6 0 0 1 12 0M16 5a3 3 0 0 1 0 6m2 9a6 6 0 0 0-3-5.2',
   doc: 'M6 3h8l4 4v14H6zM14 3v4h4M9 12h6M9 16h6',
   swap: 'M7 4 3 8l4 4M3 8h14m0 12 4-4-4-4m4 4H7',
+  swapV: 'M7 20V4M4 7l3-3 3 3m7-3v16m-3-3 3 3 3-3',
   arrowUp: 'M12 19V5m-6 6 6-6 6 6',
   arrowDown: 'M12 5v14m-6-6 6 6 6-6',
   layers: 'm12 3 9 5-9 5-9-5zm-9 9 9 5 9-5M3 16l9 5 9-5',

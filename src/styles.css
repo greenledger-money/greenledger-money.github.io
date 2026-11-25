@@ -291,3 +291,9 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .cat-row .fold[aria-expanded=true] svg { transform: rotate(90deg); }
 .cat-row .fold-gap { width: 32px; flex: none; }
 @media (prefers-reduced-motion: reduce) { .cat-row .fold svg { transition: none; } }
+
+/* 轉帳：「轉入」旁邊的交換按鈕 */
+.swap-lbl { display: inline-flex; align-items: center; gap: 8px; }
+.swapbtn { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--accent-soft); color: var(--accent); flex: none; }
+.swapbtn svg { width: 18px; height: 18px; stroke-width: 2.2; }
+.swapbtn:disabled { opacity: .4; }
