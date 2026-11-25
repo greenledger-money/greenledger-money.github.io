@@ -137,7 +137,8 @@ async function main() {
 
   const rest = async (path, init = {}) => {
     const res = await fetch(`${base}/rest/v1/${path}`, { ...init, headers: { ...headers, ...init.headers } });
-    if (!res.ok) throw new Error(`Supabase ${res.status}：${await res.text()}`);
+    // 錯誤訊息只留代碼和說明：details 可能帶到股票代號，公開 repo 的執行紀錄任何人都看得到
+    if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error(`Supabase ${res.status}：${b.code ?? ''} ${b.message ?? ''}`.trim()); }
     return res.status === 204 ? null : res.json().catch(() => null);
   };
   const upsert = (table, conflict, rows) => (rows.length
@@ -151,7 +152,7 @@ async function main() {
   };
   const get = async (url) => {
     const res = await fetch(url, { headers: { 'User-Agent': 'ledger-app-price-updater' } });
-    if (!res.ok) throw new Error(`${url} → ${res.status}`);
+    if (!res.ok) throw new Error(`${new URL(url).host} → ${res.status}`); // 不印完整網址（裡面有股票代號）
     return res;
   };
 
@@ -172,12 +173,13 @@ async function main() {
           try {
             const row = parseYahooQuote(await (await get(YAHOO_URL(y).replace('range=5d', 'range=1d'))).json(), market, sym);
             if (row) { rows.push(row); break; }
-          } catch (e) { console.warn(`${y}：${e.message}`); }
+          } catch (e) { console.warn(`${market} 盤中有一檔失敗：${e.message}`); }
         }
         await new Promise((r) => setTimeout(r, 200));
       }
       await upsert('stock_prices', 'market,symbol,price_date', rows);
-      console.log(`${market} 盤中：${rows.length}/${wanted.length} 檔 ${rows.map((r) => `${r.symbol} ${r.close}`).join('、')}`);
+      // 只印檔數：repo 是公開的，執行紀錄任何人都看得到，不能印出持有哪些股票
+      console.log(`${market} 盤中：${rows.length}/${wanted.length} 檔`);
     }
     return;
   }
@@ -209,16 +211,16 @@ async function main() {
       const missing = [];
       for (const sym of wanted) {
         let row = null;
-        try { row = parseStooqCsv(await (await get(STOOQ_URL(sym))).text()); } catch (e) { console.warn(`Stooq ${sym} 失敗：${e.message}`); }
+        try { row = parseStooqCsv(await (await get(STOOQ_URL(sym))).text()); } catch (e) { console.warn(`Stooq 有一檔失敗：${e.message}`); }
         if (!row) {
-          try { row = parseYahooChart(await (await get(YAHOO_URL(sym))).json(), sym); } catch (e) { console.warn(`Yahoo ${sym} 失敗：${e.message}`); }
+          try { row = parseYahooChart(await (await get(YAHOO_URL(sym))).json(), sym); } catch (e) { console.warn(`Yahoo 有一檔失敗：${e.message}`); }
         }
         if (row) rows.push(row); else missing.push(sym);
         await new Promise((r) => setTimeout(r, 300)); // 不要打太快
       }
       await upsert('stock_prices', 'market,symbol,price_date', rows);
-      console.log(`美股收盤價：${rows.length}/${wanted.length} 檔 ${rows.map((r) => `${r.symbol} ${r.close}（${r.price_date}）`).join('、')}`);
-      if (missing.length) throw new Error(`抓不到：${missing.join('、')}`);
+      console.log(`美股收盤價：${rows.length}/${wanted.length} 檔`);
+      if (missing.length) throw new Error(`有 ${missing.length} 檔抓不到`);
     } else console.log('美股收盤價：沒有人持有美股，略過');
   } catch (e) { failures++; console.error('美股收盤價失敗：', e.message); }
 
