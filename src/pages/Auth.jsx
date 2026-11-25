@@ -60,6 +60,7 @@ export default function Auth({ supa, onDemo, hasDemoData }) {
   return (
     <div className="auth">
       <div className="brand">
+        <img className="brand-logo" src="icons/icon-192.png" alt="" width="64" height="64" />
         <h1>{APP.name}</h1>
         <p>收支、帳戶、股票，一次看清楚。</p>
       </div>

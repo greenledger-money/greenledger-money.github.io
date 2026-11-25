@@ -11,7 +11,7 @@ import { computeBalances, netWorth, netWorthSeries, buildSplit, buildFee, uid } 
 import { runFifo, makePriceBook, valuePositions, stockValueByAccount, tradeNetAmount, realizedTxnPlan } from './lib/stocks.js';
 import { dueOccurrences, occurrenceDate } from './lib/recurring.js';
 import { DEFAULT_SETTINGS, defaultAccountRows, defaultCategoryRows, missingSystemRows } from './lib/defaults.js';
-import { round2 } from './lib/money.js';
+import { CURRENCIES, round2 } from './lib/money.js';
 import { addDays, startOfDayIso, todayStr } from './lib/dates.js';
 
 const Ctx = createContext(null);
@@ -143,9 +143,13 @@ export function LedgerProvider({ backend, user, children }) {
 
   // ---------- 載入 ----------
   const loadShared = useCallback(async (t) => {
-    const currencies = [...new Set(['USD', ...t.accounts.map((a) => a.currency), ...t.stock_trades.map((x) => x.currency)])].filter((c) => c !== 'TWD');
+    // 常用幣別都載入（刷卡、記外幣時隨時可能用到），再加上帳戶、交易用到的
+    const currencies = [...new Set([...CURRENCIES, ...t.accounts.map((a) => a.currency), ...t.stock_trades.map((x) => x.currency),
+      ...t.transactions.map((x) => x.orig_currency).filter(Boolean)])].filter((c) => c !== 'TWD');
     const symbols = [...new Set(t.stock_trades.map((x) => x.symbol))];
-    const since = addDays(todayStr(), -400);
+    // 股價從第一筆股票交易開始（淨資產走勢要用當時的市價），沒有交易就只抓近一年
+    const first = t.stock_trades.reduce((m, x) => (x.trade_date < m ? x.trade_date : m), addDays(todayStr(), -400));
+    const since = addDays(first, -14);
     const sh = await backend.loadShared({ currencies, symbols, since });
     setShared(sh);
     sharedRef.current = sh;

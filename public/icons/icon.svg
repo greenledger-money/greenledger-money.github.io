@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#34503C"/>
+  <!-- 圓環圖 -->
+  <g transform="translate(256 256) rotate(-90)" fill="none" stroke-width="58" stroke-linecap="butt">
+    <circle r="130" stroke="#F7F5F0" stroke-dasharray="402 1000"/>
+    <circle r="130" stroke="#E2A644" stroke-dasharray="0 414 196 1000"/>
+    <circle r="130" stroke="#8FB592" stroke-dasharray="0 622 183 1000"/>
+  </g>
+  <!-- 中間的葉子 -->
+  <g transform="translate(256 256) rotate(-35)">
+    <path d="M0 -62 C 40 -44 44 18 0 62 C -44 18 -40 -44 0 -62 Z" fill="#8FB592"/>
+    <path d="M0 -40 L0 44" stroke="#34503C" stroke-width="7" stroke-linecap="round"/>
+  </g>
+</svg>
