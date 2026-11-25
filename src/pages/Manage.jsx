@@ -17,6 +17,7 @@ export function More() {
     ['templates', 'bolt', '範本', `${data.templates.length} 個`],
     ['recurring', 'repeat', '固定收支', `${data.recurring_rules.filter((r) => r.active).length} 個進行中`],
     ['categories', 'tag', '分類', ''],
+    ['inbox', 'phone', '捷徑與自動記帳', 'Siri 記一筆、刷卡通知信'],
     ['import', 'upload', '從 CWMoney 匯入', ''],
     ['export', 'download', '匯出 CSV', ''],
     ['settings', 'gear', '設定', user.demo ? '試用模式' : user.email],

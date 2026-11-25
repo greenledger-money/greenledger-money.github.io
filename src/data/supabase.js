@@ -103,6 +103,15 @@ export async function createSupabaseBackend({ url, key, createClient: injected }
       return unwrap(await sb.from(table).update(patch).eq(keyCol, id).select().single());
     },
 
+    /** 捷徑／信箱用的記帳碼（只存雜湊，原本的碼只在產生時顯示一次） */
+    inboxTokens: {
+      list: async () => unwrap(await sb.from('inbox_tokens').select('id,label,created_at,last_used_at').order('created_at')) ?? [],
+      add: async (row) => unwrap(await sb.from('inbox_tokens').insert([row]).select('id,label,created_at,last_used_at').single()),
+      remove: async (id) => { unwrap(await sb.from('inbox_tokens').delete().eq('id', id)); },
+    },
+    inboxUrl: `${url.replace(/\/$/, '')}/rest/v1/rpc/inbox_add`,
+    inboxKey: key,
+
     /** 多筆改成同樣的內容（一次 100 筆） */
     async updateMany(table, ids, patch) {
       const out = [];

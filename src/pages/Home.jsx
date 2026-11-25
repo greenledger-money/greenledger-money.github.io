@@ -25,6 +25,20 @@ export function PendingList() {
   }
   function openFromPending(p) {
     if (p.source === 'broker') { openTrade({ initial: { ...p.payload, pending_item_id: p.id } }); return; }
+    if (p.source === 'email' || p.source === 'shortcut') {
+      const x = p.payload ?? {};
+      const note = p.source === 'email' ? `${x.merchant || ''}${x.currency && x.currency !== 'TWD' ? `（${x.currency} ${x.amount}）` : ''}`.trim() : x.note ?? '';
+      // 同一個商店上次記在哪個分類，就先帶那個
+      const same = x.merchant && data.transactions.find((t) => t.type === 'expense' && t.note && t.note.startsWith(x.merchant));
+      openEntry({
+        initial: {
+          type: x.type ?? 'expense', amount: x.amount, note, occurred_at: x.at ?? new Date().toISOString(),
+          account_id: x.account_id ?? (p.source === 'email' ? data.settings.emailAccountId : null) ?? undefined,
+          category_id: x.category_id ?? same?.category_id ?? undefined, pending_item_id: p.id, source: p.source,
+        },
+      });
+      return;
+    }
     const rule = data.recurring_rules.find((r) => r.id === p.recurring_id);
     openEntry({
       initial: {
@@ -44,10 +58,16 @@ export function PendingList() {
         {data.pending.map((p) => {
           const rule = data.recurring_rules.find((r) => r.id === p.recurring_id);
           const acc = data.accById.get(rule?.account_id ?? p.payload?.brokerage_account_id);
+          const inbox = p.source === 'email' || p.source === 'shortcut';
           const title = p.source === 'broker'
             ? `${p.payload?.side === 'sell' ? '賣出' : '買進'} ${p.payload?.symbol ?? ''} ${p.payload?.name ?? ''}`
-            : rule?.name ?? '固定收支';
-          const sub = p.source === 'broker' ? `券商成交 · ${p.payload?.shares ?? '?'} 股 @ ${p.payload?.price ?? '?'}` : `${describe(rule)} · ${acc?.name ?? ''}`;
+            : p.source === 'email' ? (p.payload?.merchant || '信用卡消費')
+              : p.source === 'shortcut' ? (p.payload?.note || p.payload?.category || '捷徑記的一筆')
+                : rule?.name ?? '固定收支';
+          const sub = p.source === 'broker' ? `券商成交 · ${p.payload?.shares ?? '?'} 股 @ ${p.payload?.price ?? '?'}`
+            : p.source === 'email' ? `刷卡通知${p.payload?.card ? ` · 末四碼 ${p.payload.card}` : ''}`
+              : p.source === 'shortcut' ? `捷徑${p.payload?.category ? ` · ${p.payload.category}（找不到這個分類）` : ''}`
+                : `${describe(rule)} · ${acc?.name ?? ''}`;
           return (
             <div key={p.id} className="item" style={{ flexWrap: 'wrap' }}>
               <div className="main">
@@ -55,9 +75,10 @@ export function PendingList() {
                 <div className="sub">{dayLabel(p.due_date)}{p.due_date < today ? '（已過）' : ''} · {sub}</div>
               </div>
               {rule && <Money value={rule.amount} currency={acc?.currency} tone={rule.type === 'expense' ? 'expense' : rule.type === 'income' ? 'income' : ''} />}
+              {inbox && <Money value={p.payload?.amount} currency={p.payload?.currency ?? 'TWD'} tone={p.payload?.type === 'income' ? 'income' : 'expense'} />}
               <div className="row-flex" style={{ width: '100%', justifyContent: 'flex-end' }}>
                 <button className="btn small" onClick={() => skip(p)} disabled={busy}>跳過</button>
-                <button className="btn small" onClick={() => openFromPending(p)} disabled={busy}>{p.source === 'broker' ? '檢查後確認' : '改金額'}</button>
+                <button className="btn small" onClick={() => openFromPending(p)} disabled={busy}>{p.source === 'broker' ? '檢查後確認' : inbox ? '確認' : '改金額'}</button>
                 {p.source === 'recurring' && <button className="btn small primary" onClick={() => quickConfirm(p)} disabled={busy}>確認</button>}
               </div>
             </div>

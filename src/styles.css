@@ -382,3 +382,13 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .filtered-out b { color: var(--income); font-weight: 600; white-space: nowrap; }
 .filtered-out .btn { flex: none; }
 .toggle input:disabled + span { opacity: .55; }
+
+/* 捷徑與自動記帳 */
+.token-card { border: 1.5px solid var(--income); }
+.token { display: block; word-break: break-all; font-size: 13px; background: var(--surface-2); padding: 10px; border-radius: 10px; user-select: all; }
+.steps { margin: 0; padding: 14px 14px 14px 34px; display: grid; gap: 10px; font-size: 14px; line-height: 1.55; }
+.steps .kv { display: flex; gap: 8px; margin-top: 4px; align-items: baseline; }
+.steps .kv span { flex: none; width: 4.5em; color: var(--muted); font-size: 13px; }
+.steps code, pre.code { font-size: 12px; background: var(--surface-2); border-radius: 6px; padding: 2px 6px; word-break: break-all; }
+pre.code { white-space: pre-wrap; padding: 10px; max-height: 320px; overflow: auto; margin: 8px 0 0; }
+details.card summary { cursor: pointer; color: var(--ink-2); }

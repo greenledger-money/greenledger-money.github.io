@@ -12,6 +12,7 @@ import Reports, { ReportCategory, ReportTxns } from './pages/Reports.jsx';
 import Stocks, { StockDetail, TradeSheet } from './pages/Stocks.jsx';
 import { Categories, More, Recurring, Templates } from './pages/Manage.jsx';
 import Import from './pages/Import.jsx';
+import Inbox from './pages/Inbox.jsx';
 import { Export, Privacy, Settings } from './pages/Settings.jsx';
 import { createLocalBackend } from './data/local.js';
 import { createSupabaseBackend } from './data/supabase.js';
@@ -42,7 +43,7 @@ const TABS = [
   { name: 'reports', label: '報表', icon: 'chart' },
   { name: 'more', label: '更多', icon: 'more' },
 ];
-const TAB_OF = { budget: 'more', rcat: 'reports', rtx: 'reports', account: 'accounts', transactions: 'more', stocks: 'more', stock: 'more', templates: 'more', recurring: 'more', categories: 'more', import: 'more', export: 'more', settings: 'more', privacy: 'more' };
+const TAB_OF = { budget: 'more', rcat: 'reports', rtx: 'reports', account: 'accounts', transactions: 'more', stocks: 'more', stock: 'more', templates: 'more', recurring: 'more', categories: 'more', import: 'more', inbox: 'more', export: 'more', settings: 'more', privacy: 'more' };
 
 function Shell({ openEntry }) {
   const { status, data, actions, backend } = useLedger();
@@ -78,6 +79,7 @@ function Shell({ openEntry }) {
     case 'recurring': page = <Recurring />; break;
     case 'categories': page = <Categories />; break;
     case 'import': page = <Import />; break;
+    case 'inbox': page = <Inbox />; break;
     case 'export': page = <Export />; break;
     case 'settings': page = <Settings />; break;
     case 'privacy': page = <Privacy />; break;

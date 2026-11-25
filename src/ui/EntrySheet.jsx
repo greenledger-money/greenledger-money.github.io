@@ -196,7 +196,7 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
     if (ok) setTplName(null);
   }
 
-  const title = initial.pending_item_id ? '確認固定收支' : original ? '修改' : '記一筆';
+  const title = initial.pending_item_id ? (initial.source === 'recurring' ? '確認固定收支' : '確認這筆') : original ? '修改' : '記一筆';
   if (locked) {
     return (
       <Sheet title="交易明細" onClose={() => onClose(false)}>
