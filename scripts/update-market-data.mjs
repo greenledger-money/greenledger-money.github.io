@@ -1,5 +1,6 @@
 // 每天收盤後執行（GitHub Actions），改了這支程式推上去也會馬上跑一次：
 //   1. 台股收盤價：TWSE OpenAPI（上市）＋ TPEx OpenAPI（上櫃），只存「有人持有」的代號
+//   1b. 美股收盤價：Stooq（免費、不用金鑰），抓不到改用 Yahoo Finance；一樣只存有人持有的代號
 //   2. 匯率：台灣銀行牌告匯率，存即期買賣的中間價（1 外幣 = ? 台幣）；
 //      台銀會擋 GitHub 的伺服器（回驗證頁），擋到時改用 open.er-api.com 的每日匯率
 // 寫入 Supabase 的 stock_prices、fx_rates（這兩張表只有 secret key 能寫）。
@@ -12,6 +13,8 @@ const TWSE_URL = 'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL';
 const TPEX_URL = 'https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes';
 const BOT_URL = (day = 'day') => `https://rate.bot.com.tw/xrt/flcsv/0/${day}`;
 const ER_URL = 'https://open.er-api.com/v6/latest/TWD';
+const STOOQ_URL = (sym) => `https://stooq.com/q/l/?s=${encodeURIComponent(sym.toLowerCase())}.us&f=sd2t2c&h&e=csv`;
+const YAHOO_URL = (sym) => `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=5d&interval=1d`;
 const CURRENCIES = ['USD', 'JPY', 'EUR', 'CNY', 'HKD', 'GBP', 'AUD', 'CAD', 'SGD', 'KRW', 'CHF', 'NZD', 'THB'];
 
 /** 台北時間的今天 'YYYY-MM-DD' */
@@ -73,6 +76,30 @@ export function parseErApi(json, date) {
 }
 
 // ---------------------------------------------------------------------
+/** Stooq CSV（Symbol,Date,Time,Close）→ { market, symbol, price_date, close }；沒資料回傳 null */
+export function parseStooqCsv(text) {
+  const lines = String(text).trim().split(/\r?\n/);
+  if (lines.length < 2) return null;
+  const [sym, date, , close] = lines[1].split(',').map((x) => x.trim());
+  const c = Number(close);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !(c > 0)) return null; // 查不到時是 N/D
+  return { market: 'US', symbol: sym.replace(/\.US$/i, '').toUpperCase(), price_date: date, close: c, name: null };
+}
+
+/** Yahoo chart JSON → 最後一個有收盤價的交易日（日期用紐約時間） */
+export function parseYahooChart(json, symbol) {
+  const r = json?.chart?.result?.[0];
+  const ts = r?.timestamp ?? [];
+  const closes = r?.indicators?.quote?.[0]?.close ?? [];
+  for (let i = ts.length - 1; i >= 0; i--) {
+    const c = Number(closes[i]);
+    if (!(c > 0)) continue;
+    const price_date = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ts[i] * 1000));
+    return { market: 'US', symbol: symbol.toUpperCase(), price_date, close: Math.round(c * 10000) / 10000, name: null };
+  }
+  return null;
+}
+
 async function main() {
   const base = process.env.SUPABASE_URL?.replace(/\/$/, '');
   const key = process.env.SUPABASE_SECRET_KEY;
@@ -118,6 +145,28 @@ async function main() {
       console.log(`台股收盤價：${rows.length}/${wanted.size} 檔`);
     } else console.log('台股收盤價：沒有人持有台股，略過');
   } catch (e) { failures++; console.error('台股收盤價失敗：', e.message); }
+
+  // 1b. 美股收盤價（只抓有人持有的代號）
+  try {
+    const held = await rest('stock_trades?select=symbol&market=eq.US');
+    const wanted = [...new Set((held ?? []).map((r) => r.symbol.toUpperCase()))];
+    if (wanted.length) {
+      const rows = [];
+      const missing = [];
+      for (const sym of wanted) {
+        let row = null;
+        try { row = parseStooqCsv(await (await get(STOOQ_URL(sym))).text()); } catch (e) { console.warn(`Stooq ${sym} 失敗：${e.message}`); }
+        if (!row) {
+          try { row = parseYahooChart(await (await get(YAHOO_URL(sym))).json(), sym); } catch (e) { console.warn(`Yahoo ${sym} 失敗：${e.message}`); }
+        }
+        if (row) rows.push(row); else missing.push(sym);
+        await new Promise((r) => setTimeout(r, 300)); // 不要打太快
+      }
+      await upsert('stock_prices', 'market,symbol,price_date', rows);
+      console.log(`美股收盤價：${rows.length}/${wanted.length} 檔 ${rows.map((r) => `${r.symbol} ${r.close}（${r.price_date}）`).join('、')}`);
+      if (missing.length) throw new Error(`抓不到：${missing.join('、')}`);
+    } else console.log('美股收盤價：沒有人持有美股，略過');
+  } catch (e) { failures++; console.error('美股收盤價失敗：', e.message); }
 
   // 2. 今天的匯率
   try {
