@@ -1,7 +1,7 @@
 // 帳戶：依類型分組、餘額（外幣另顯示台幣）、隱藏帳戶、新增／修改；帳戶明細
 import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
-import { Empty, Field, Icon, Item, MoveButtons, Money, Page, Section, Seg, Sheet, Toggle, back, go, useAction, useUI, Tile, accountIcon } from '../ui/kit.jsx';
+import { Empty, Field, Icon, Item, MoveButtons, Money, Page, Section, Seg, Sheet, Toggle, back, go, useAction, useUI, Tile, accountIcon, IconPicker } from '../ui/kit.jsx';
 import { TxnList } from '../ui/TxnList.jsx';
 import { BrokerageView } from './Stocks.jsx';
 import { WorthCard } from './Home.jsx';
@@ -33,6 +33,7 @@ export function AccountSheet({ original, onClose }) {
     <Sheet title={original ? '修改帳戶' : '新增帳戶'} onClose={onClose} onSave={save} saving={busy}>
       <div className="form">
         <Field label="名稱"><input className="input" value={f.name} maxLength={40} onChange={set('name')} placeholder="例如：國泰 Cube 卡" /></Field>
+        <Field label="圖示"><IconPicker value={f.icon ?? null} onChange={set('icon')} auto={accountIcon(f.type)} /></Field>
         <Field label="類型">
           <select className="input" value={f.type} onChange={set('type')} disabled={!!sys}>
             {ACCOUNT_TYPES.filter((t) => t.value !== 'friends_owe' || sys || f.type === 'friends_owe').map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -86,7 +87,7 @@ export default function Accounts() {
     const native = isBrk ? data.stockValue.get(a.id)?.native ?? 0 : data.balances.get(a.id);
     const twd = data.worth.rows.find((r) => r.account.id === a.id)?.twd;
     return (
-      <Item key={a.id} title={a.name} left={<Tile name={accountIcon(a.type)} tone={a.type === 'friends_owe' ? 'income' : a.type === 'credit_card' || a.type === 'loan' ? 'expense' : ''} />}
+      <Item key={a.id} title={a.name} left={<Tile name={accountIcon(a)} tone={a.type === 'friends_owe' ? 'income' : a.type === 'credit_card' || a.type === 'loan' ? 'expense' : ''} />}
         sub={isBrk ? '股票市值' : data.unsettled.get(a.id) ? `待交割 ${fmt(data.unsettled.get(a.id), a.currency, { sign: true })}` : a.currency !== 'TWD' ? a.currency : null}
         value={<Money value={native} currency={a.currency} className={native < 0 ? 'expense' : ''} />}
         valueSub={a.currency !== 'TWD' && twd != null ? `≈ ${fmt(twd)}` : null}

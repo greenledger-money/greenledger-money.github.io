@@ -177,8 +177,8 @@ export default function Home() {
           <button className="iconbtn" aria-label="下一週" onClick={() => shiftWeek(1)}><Icon name="chev" /></button>
         </div>
         <div className="stats" style={{ padding: '0 8px' }}>
-          <div className="stat"><Tile name="arrowUp" tone="solid income" round size={26} /><span className="label small muted">{m} 月收入</span><b className="num income">{fmt(s.income)}</b></div>
-          <div className="stat"><Tile name="arrowDown" tone="solid expense" round size={26} /><span className="label small muted">{m} 月支出</span><b className="num expense">{fmt(s.expense)}</b></div>
+          <div className="stat"><Tile name="arrowDown" tone="solid income" round size={26} /><span className="label small muted">{m} 月收入</span><b className="num income">{fmt(s.income)}</b></div>
+          <div className="stat"><Tile name="arrowUp" tone="solid expense" round size={26} /><span className="label small muted">{m} 月支出</span><b className="num expense">{fmt(s.expense)}</b></div>
           <div className="stat"><Tile name="wallet" tone="solid" round size={26} /><span className="label small muted">結餘</span><b className={`num ${s.net < 0 ? 'expense' : ''}`}>{fmt(s.net)}</b></div>
         </div>
         {day !== today && <button className="link" style={{ justifySelf: 'center', padding: 0 }} onClick={() => setDay(today)}>回到今天</button>}

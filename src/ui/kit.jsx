@@ -60,6 +60,23 @@ const PATHS = {
   arrowUp: 'M12 19V5m-6 6 6-6 6 6',
   arrowDown: 'M12 5v14m-6-6 6 6 6-6',
   layers: 'm12 3 9 5-9 5-9-5zm-9 9 9 5 9-5M3 16l9 5 9-5',
+  car: 'M4 16v-4l2-5h12l2 5v4zM4 16v3h3v-3m10 0v3h3v-3M4 12h16M7.5 14h.01M16.5 14h.01',
+  gas: 'M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M4 10h10M14 9h2a2 2 0 0 1 2 2v5a1.5 1.5 0 0 0 3 0V8l-3-3',
+  cart: 'M3 4h2l2.4 11h11.2L21 7H6.2M10 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm8 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z',
+  beer: 'M6 8h10v12H6zM16 11h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2M6 8a3 3 0 0 1 3-4h4a3 3 0 0 1 3 4M9 12v5m4-5v5',
+  bolt: 'M13 2 4 14h7l-1 8 9-12h-7z',
+  drop: 'M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11Z',
+  wifi: 'M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01',
+  film: 'M4 4h16v16H4zM8 4v16M16 4v16M4 8h4m-4 4h4m-4 4h4m8-8h4m-4 4h4m-4 4h4',
+  music: 'M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm11-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
+  ball: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM3.5 9h17M3.5 15h17M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18',
+  dumbbell: 'M6 7v10M3 9v6M18 7v10M21 9v6M6 12h12',
+  pill: 'M10.5 20.5a5 5 0 0 1-7-7l7-7a5 5 0 0 1 7 7zM7 10l7 7',
+  heart: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z',
+  scissors: 'M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM8.1 7.9 20 20M8.1 16.1 20 4',
+  sparkle: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 15l.7 2.3L22 18l-2.3.7L19 21l-.7-2.3L16 18l2.3-.7z',
+  baby: 'M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM9 12h.01M15 12h.01M10 16a3 3 0 0 0 4 0M12 5a2 2 0 0 1 2-2',
+  wrench: 'M15 4a5 5 0 0 0-4.6 6.9L3 18.3 5.7 21l7.4-7.4A5 5 0 0 0 20 9l-3 3-3-3 3-3a5 5 0 0 0-2-2Z',
 };
 /** 圓角方塊裡的圖示（像「更多」清單左邊那種） */
 export function Tile({ name, tone = '', round = false, size }) {
@@ -75,15 +92,45 @@ const CAT_ICONS = [
   [/學|書|課|教育/, 'book'], [/人際|禮|紅包|請客|交際/, 'gift'], [/寵物/, 'paw'], [/3C|電子|手機|電腦/, 'phone'],
   [/例外|年度/, 'calendar'], [/股利|配息/, 'coins'], [/股票|投資|證券/, 'stock'], [/利息/, 'percent'], [/獎金|獎/, 'star'], [/薪|工作|兼職/, 'briefcase'],
 ];
+// 從最底層往上：自己選的圖示優先，沒有就看名稱關鍵字；子分類沒設就沿用上層
 export function categoryIcon(tree, id) {
   const chain = id ? tree.chain(id) : [];
   for (let i = chain.length - 1; i >= 0; i--) {
+    if (chain[i].icon && PATHS[chain[i].icon]) return chain[i].icon;
     for (const [re, icon] of CAT_ICONS) if (re.test(chain[i].name)) return icon;
   }
   return 'tag';
 }
 const ACC_ICONS = { cash: 'cash', bank: 'bank', credit_card: 'card', e_payment: 'phone', brokerage: 'stock', friends_owe: 'people', loan: 'doc', other: 'wallet' };
-export const accountIcon = (type) => ACC_ICONS[type] ?? 'wallet';
+/** 帳戶圖示：自己選的優先，沒有就照類型（也可以直接傳類型字串） */
+export const accountIcon = (a) => (typeof a === 'string' ? ACC_ICONS[a] : (a?.icon && PATHS[a.icon]) ? a.icon : ACC_ICONS[a?.type]) ?? 'wallet';
+
+// 可以自己選的圖示
+export const ICON_CHOICES = ['food', 'coffee', 'beer', 'cart', 'bag', 'shirt', 'home', 'bolt', 'drop', 'wifi', 'receipt', 'phone',
+  'bus', 'car', 'gas', 'plane', 'game', 'film', 'music', 'ball', 'dumbbell', 'medical', 'pill', 'heart', 'scissors', 'sparkle',
+  'book', 'gift', 'baby', 'paw', 'people', 'briefcase', 'star', 'coins', 'percent', 'stock', 'cash', 'bank', 'card', 'wallet',
+  'doc', 'wrench', 'calendar', 'tag'];
+
+const ICON_LABELS = { food: '餐點', coffee: '飲料', beer: '喝酒', cart: '購物車', bag: '購物袋', shirt: '衣服', home: '房子', bolt: '電', drop: '水', wifi: '網路',
+  receipt: '帳單', phone: '手機', bus: '公車', car: '汽車', gas: '加油', plane: '飛機', game: '遊戲', film: '電影', music: '音樂', ball: '球類',
+  dumbbell: '健身', medical: '醫療', pill: '藥', heart: '愛心', scissors: '剪刀', sparkle: '美容', book: '書', gift: '禮物', baby: '小孩', paw: '寵物',
+  people: '朋友', briefcase: '工作', star: '獎金', coins: '股利', percent: '利息', stock: '股票', cash: '現金', bank: '銀行', card: '信用卡', wallet: '錢包',
+  doc: '文件', wrench: '維修', calendar: '日曆', tag: '標籤' };
+/** 圖示選單：value 空著＝自動（auto 是自動時會顯示的圖示） */
+export function IconPicker({ value, auto, onChange, tone = '' }) {
+  return (
+    <div className="iconpick" role="radiogroup" aria-label="圖示">
+      <button type="button" role="radio" aria-checked={!value} className="ip auto" onClick={() => onChange(null)} title="自動">
+        <Tile name={auto} tone={tone} round size={40} /><span>自動</span>
+      </button>
+      {ICON_CHOICES.filter((n) => PATHS[n]).map((n) => (
+        <button key={n} type="button" role="radio" aria-checked={value === n} aria-label={ICON_LABELS[n] ?? n} title={ICON_LABELS[n] ?? n} className="ip" onClick={() => onChange(n)}>
+          <Tile name={n} tone={tone} round size={40} />
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function Icon({ name, className, title }) {
   return (

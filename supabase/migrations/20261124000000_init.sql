@@ -40,6 +40,7 @@ create table public.accounts (
   opening_balance numeric(18,2) not null default 0,
   hidden          boolean not null default false,
   sort_order      int not null default 0,
+  icon            text check (icon is null or icon ~ '^[A-Za-z0-9]{1,24}$'),   -- 自己選的圖示，空著就照類型
   system_key      text check (system_key in ('friends_owe')),   -- 系統帳戶：「朋友欠我」
   created_at      timestamptz not null default now(),
   unique (id, user_id),
@@ -57,6 +58,7 @@ create table public.categories (
   name        text not null check (length(btrim(name)) between 1 and 30),
   archived    boolean not null default false,
   sort_order  int not null default 0,
+  icon        text check (icon is null or icon ~ '^[A-Za-z0-9]{1,24}$'),   -- 自己選的圖示，空著就自動判斷
   -- 程式會用到的系統分類：其他支出-手續費、其他支出-股票虧損、投資收入-股利、投資收入-利息、投資收入-股票獲利（以及它們的上層）
   system_key  text check (system_key in ('other_expense','fee','stock_loss','investment_income','dividend','interest','stock_gain')),
   created_at  timestamptz not null default now(),

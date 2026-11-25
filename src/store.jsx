@@ -257,7 +257,7 @@ export function LedgerProvider({ backend, user, children }) {
 
     async function saveAccount(form, original) {
       const row = {
-        name: form.name.trim(), type: form.type, currency: form.currency,
+        name: form.name.trim(), type: form.type, currency: form.currency, icon: form.icon || null,
         opening_balance: round2(Number(form.opening_balance) || 0), hidden: !!form.hidden,
       };
       if (original) return updateRow('accounts', original.id, row);
@@ -265,7 +265,7 @@ export function LedgerProvider({ backend, user, children }) {
     }
 
     async function saveCategory(form, original) {
-      const row = { name: form.name.trim(), parent_id: form.parent_id || null, kind: form.kind, archived: !!form.archived };
+      const row = { name: form.name.trim(), parent_id: form.parent_id || null, kind: form.kind, archived: !!form.archived, icon: form.icon || null };
       if (original) return updateRow('categories', original.id, row);
       return (await insertRows('categories', [{ ...row, sort_order: 50 }]))[0];
     }

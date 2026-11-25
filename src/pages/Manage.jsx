@@ -1,7 +1,7 @@
 // 「更多」選單，以及範本、固定收支、分類的管理頁
 import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
-import { Empty, Field, Group, Icon, Item, MoveButtons, Money, Page, Section, Seg, Sheet, Toggle, back, go, useAction, useUI, Tile, categoryIcon } from '../ui/kit.jsx';
+import { Empty, Field, Group, Icon, Item, MoveButtons, Money, Page, Section, Seg, Sheet, Toggle, back, go, useAction, useUI, Tile, categoryIcon, IconPicker } from '../ui/kit.jsx';
 import { AccountSelect, CategoryButton } from '../ui/pickers.jsx';
 import { parentOptions, validateCategory } from '../lib/categories.js';
 import { describe, nextDate, UNIT_LABEL } from '../lib/recurring.js';
@@ -226,6 +226,10 @@ function CategorySheet({ original, kind, parentId, onClose }) {
             <option value="">（最上層）</option>
             {opts.map((o) => <option key={o.id} value={o.id}>{'　'.repeat(o.depth - 1)}{o.label}</option>)}
           </select>
+        </Field>
+        <Field label="圖示" hint={f.icon ? '' : '「自動」會照名稱判斷；子分類沒選就跟上層一樣'}>
+          <IconPicker value={f.icon ?? null} onChange={(v) => setF({ ...f, icon: v })} tone={f.kind === 'income' ? 'income' : ''}
+            auto={categoryIcon({ ...data.tree, chain: () => [...(f.parent_id ? data.tree.chain(f.parent_id) : []), { name: f.name, icon: null }] }, 'x')} />
         </Field>
         {original && <div className="row-flex"><span className="grow">封存<div className="small muted">舊帳保留，記帳時不再出現</div></span><Toggle label="封存" checked={f.archived} onChange={(v) => setF({ ...f, archived: v })} /></div>}
         {original?.system_key && <p className="small muted">這是系統分類（程式會用到），可以改名、搬移，但不能刪除。</p>}

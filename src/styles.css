@@ -297,3 +297,8 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .swapbtn { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--accent-soft); color: var(--accent); flex: none; }
 .swapbtn svg { width: 18px; height: 18px; stroke-width: 2.2; }
 .swapbtn:disabled { opacity: .4; }
+
+/* 圖示選單 */
+.iconpick { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 6px; max-height: 260px; overflow-y: auto; overscroll-behavior: contain; padding: 4px; background: var(--surface); border-radius: 14px; border: 1px solid var(--line); }
+.iconpick .ip { border: 0; background: none; display: grid; justify-items: center; gap: 2px; padding: 4px 0; border-radius: 12px; font-size: 11px; color: var(--muted); }
+.iconpick .ip[aria-checked=true] { background: var(--accent-soft); outline: 2px solid var(--accent); outline-offset: -2px; }
