@@ -328,6 +328,7 @@ export function LedgerProvider({ backend, user, children }) {
         amount: round2(Number(form.amount)), fx_rate: Number(form.fx_rate) || 1,
         note: (form.note ?? '').trim(), is_exception: !!form.is_exception,
       };
+      if (form.counterparty !== undefined || original?.counterparty) base.counterparty = form.counterparty || null;
       if (form.type === 'transfer') {
         Object.assign(base, { to_account_id: form.to_account_id, to_amount: round2(Number(form.to_amount)), to_fx_rate: Number(form.to_fx_rate) || 1, category_id: null });
       } else {
@@ -340,6 +341,7 @@ export function LedgerProvider({ backend, user, children }) {
           rows = buildSplit({
             accountId: base.account_id, total: base.amount, mine: Number(form.split.mine), categoryId: base.category_id,
             occurredAt: base.occurred_at, note: base.note, friendsOweId: d.friendsOwe.id, fxRate: base.fx_rate, isException: base.is_exception,
+            counterparty: base.counterparty,
           });
         } else {
           const row = { id: uid(), ...base, source: form.source ?? 'manual', pending_item_id: form.pending_item_id ?? null };

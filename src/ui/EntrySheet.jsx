@@ -84,6 +84,7 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
   const [note, setNote] = useState(src.note ?? '');
   const [isException, setIsException] = useState(!!src.is_exception || (!original && alwaysExc(initCat)));
   const [split, setSplit] = useState(false);
+  const [who, setWho] = useState(src.counterparty ?? '');
   const [fxRate, setFxRate] = useState(original ? String(Number(original.fx_rate)) : '');
   const [toFxRate, setToFxRate] = useState(original?.to_fx_rate ? String(Number(original.to_fx_rate)) : '');
   const [manual, setManual] = useState({ fx: !!original, toFx: !!original, toAmount: !!original });
@@ -161,6 +162,7 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
       note, is_exception: isException, fx_rate: Number(fxRate), to_account_id: toAcc?.id, to_amount: toAmount,
       to_fx_rate: Number(toFxRate) || 1, fee: type === 'transfer' ? evaluate(ex.fee) ?? 0 : 0,
       pending_item_id: initial.pending_item_id, source: initial.source,
+      counterparty: (split || friendsXfer) ? (who.trim() || null) : null,
     };
     if (split) {
       const mine = evaluate(ex.mine);
@@ -226,6 +228,21 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
     setAdvanced(open);
   };
   const toAmountShown = crossCurrency ? evaluate(ex.to_amount) : amount;
+  const friendsXfer = type === 'transfer' && (acc?.type === 'friends_owe' || toAcc?.type === 'friends_owe');
+  const people = useMemo(() => {
+    const m = new Map();
+    data.transactions.forEach((t) => { if (t.counterparty) m.set(t.counterparty, (m.get(t.counterparty) ?? 0) + 1); });
+    return [...m].sort((a, b) => b[1] - a[1]).map(([n]) => n);
+  }, [data.transactions]);
+  const whoRow = (
+    <div className="frow">
+      <label htmlFor="who" className="lbl">誰</label>
+      <div className="ctrl">
+        <input id="who" list="who-list" maxLength={40} value={who} placeholder="朋友的名字（可不填）" onFocus={() => setActive(null)} onChange={(e) => setWho(e.target.value)} />
+        <datalist id="who-list">{people.map((n) => <option key={n} value={n} />)}</datalist>
+      </div>
+    </div>
+  );
 
   const applyTemplate = (t) => {
     changeType(t.type);
@@ -300,11 +317,13 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
           {split && (
             <div className="formlist">
               <div className="frow"><span className="lbl">自己的部分</span><div className="ctrl"><MiniAmount label="自己的部分" expr={ex.mine} active={active === 'mine'} onFocus={() => setActive('mine')} currency={currency} placeholder="沒吃就填 0" /></div></div>
+              {whoRow}
               <div className="frow small muted" style={{ minHeight: 40 }}>
                 支出 {fmt(evaluate(ex.mine) ?? 0, currency)}，{fmt(Math.max(0, (amount ?? 0) - (evaluate(ex.mine) ?? 0)), currency)} 記到「朋友欠我」
               </div>
             </div>
           )}
+          {friendsXfer && <div className="formlist">{whoRow}</div>}
 
           <div className="datebar">
             <button type="button" aria-label="前一天" onClick={() => shiftDay(-1)}><Icon name="back" /></button>

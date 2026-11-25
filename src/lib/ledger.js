@@ -174,7 +174,7 @@ export function netWorthSeries({ accounts, txns, monthKeys, fx, stockValueAt, no
  * 分帳：總額裡「自己的部分」記支出，其餘轉進「朋友欠我」。
  * 帳戶是外幣時，朋友欠我（台幣）收到的金額用匯率換算。
  */
-export function buildSplit({ accountId, total, mine, categoryId, occurredAt, note = '', friendsOweId, fxRate = 1, isException = false }) {
+export function buildSplit({ accountId, total, mine, categoryId, occurredAt, note = '', friendsOweId, fxRate = 1, isException = false, counterparty = null }) {
   const others = round2(Number(total) - Number(mine));
   if (!(Number(total) > 0)) throw new Error('請輸入總額');
   if (Number(mine) < 0 || others < 0) throw new Error('自己的部分不能大於總額');
@@ -190,7 +190,7 @@ export function buildSplit({ accountId, total, mine, categoryId, occurredAt, not
     rows.push({
       id: uid(), type: 'transfer', occurred_at: occurredAt, account_id: accountId, amount: others, fx_rate: fxRate,
       to_account_id: friendsOweId, to_amount: round2(others * fxRate), to_fx_rate: 1,
-      note: note ? `${note}（幫朋友付）` : '幫朋友付', is_exception: false, group_id: group, source: 'split',
+      note: note ? `${note}（幫朋友付）` : '幫朋友付', is_exception: false, group_id: group, source: 'split', counterparty: counterparty || null,
     });
   }
   return rows;
