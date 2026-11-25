@@ -410,3 +410,6 @@ button.card.goal { display: grid; gap: 8px; width: 100%; border: 0; text-align: 
 /* 年度回顧 */
 .review-tiles .card { display: grid; gap: 2px; align-content: start; }
 .review-tiles .card b { font-size: 19px; }
+
+/* 明細進階篩選 */
+.adv-filter .row-flex .input { flex: 1; min-width: 0; text-align: right; }
