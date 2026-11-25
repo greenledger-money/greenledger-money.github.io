@@ -1,10 +1,9 @@
 // 年度回顧：一年的收支、儲蓄率、花最多的分類、跟去年比、淨資產變化
 import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
-import { Icon, Page, Section, Tile, back, categoryIcon, go, useUI } from '../ui/kit.jsx';
+import { Icon, Page, Section, Tile, back, categoryIcon, go, useAction, useUI } from '../ui/kit.jsx';
 import { MonthBars } from '../ui/charts.jsx';
 import { yearReview } from '../lib/review.js';
-import { netWorthSeries } from '../lib/ledger.js';
 import { thisMonth, localDate } from '../lib/dates.js';
 import { fmt } from '../lib/money.js';
 
@@ -15,15 +14,17 @@ const Change = ({ v, good = 'down' }) => {
 };
 
 export default function Year() {
-  const { data } = useLedger();
+  const { data, actions } = useLedger();
   const { openEntry } = useUI();
+  const [run] = useAction();
+  const inc = data.settings.worthIncludeStocks;
   const now = thisMonth();
   const [year, setYear] = useState(Number(now.slice(0, 4)));
   const firstYear = useMemo(() => Number(localDate(data.transactions[data.transactions.length - 1]?.occurred_at ?? new Date().toISOString()).slice(0, 4)), [data.transactions]);
   const r = useMemo(() => yearReview({ txns: data.transactions, accById: data.accById, tree: data.tree }, year, now), [data, year, now]);
   const worth = useMemo(() => {
     const end = String(year) === now.slice(0, 4) ? now : `${year}-12`;
-    const s = netWorthSeries({ accounts: data.accounts, txns: data.worthTxns, monthKeys: [`${year - 1}-12`, end], fx: data.fx, stockValueAt: data.stockValueAt, includeStocks: data.settings.worthIncludeStocks });
+    const s = data.worthSeries([`${year - 1}-12`, end], data.settings.worthIncludeStocks);
     return { start: s[0].total, end: s[1].total };
   }, [data, year, now]);
   const isNow = String(year) === now.slice(0, 4);
@@ -57,7 +58,11 @@ export default function Year() {
           <div className="grid2 review-tiles">
             <div className="card"><span className="small muted">一般支出平均每月</span><b className="num">{fmt(r.avgMonthlyNormal ?? 0)}</b></div>
             <div className="card"><span className="small muted">例外支出（占 {r.expense ? Math.round((r.exception / r.expense) * 100) : 0}%）</span><b className="num">{fmt(r.exception)}</b></div>
-            <div className="card"><span className="small muted">淨資產變化</span><b className={`num ${worth.end - worth.start < 0 ? 'expense' : 'income'}`}>{worth.end - worth.start >= 0 ? '+' : '−'}{fmt(Math.abs(worth.end - worth.start))}</b><span className="small muted">{fmt(worth.start)} → {fmt(worth.end)}</span></div>
+            <div className="card">
+              <span className="row-flex small muted" style={{ gap: 6 }}>
+                <span className="grow">淨資產變化</span>
+                <button className="chip" aria-pressed={inc} onClick={() => run(() => actions.updateSettings({ worthIncludeStocks: !inc }))} style={{ minHeight: 26, fontSize: 12, padding: '0 10px' }}>含股票</button>
+              </span><b className={`num ${worth.end - worth.start < 0 ? 'expense' : 'income'}`}>{worth.end - worth.start >= 0 ? '+' : '−'}{fmt(Math.abs(worth.end - worth.start))}</b><span className="small muted">{fmt(worth.start)} → {fmt(worth.end)}</span></div>
             <div className="card"><span className="small muted">記帳</span><b className="num">{r.count} 筆</b><span className="small muted">{r.days} 天有記</span></div>
           </div>
 

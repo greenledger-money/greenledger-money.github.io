@@ -7,7 +7,7 @@ import { friendlyError } from './data/errors.js';
 import { OFFLINE_TABLES, applyOp, applyOps, flushOps, isNetworkError, readOutbox, stampRows, writeOutbox } from './data/outbox.js';
 import { buildTree } from './lib/categories.js';
 import { makeFx } from './lib/fx.js';
-import { computeBalances, netWorth, buildSplit, buildFee, uid } from './lib/ledger.js';
+import { computeBalances, netWorth, netWorthSeries, buildSplit, buildFee, uid } from './lib/ledger.js';
 import { runFifo, makePriceBook, valuePositions, stockValueByAccount, tradeNetAmount, realizedTxnPlan } from './lib/stocks.js';
 import { dueOccurrences, occurrenceDate } from './lib/recurring.js';
 import { DEFAULT_SETTINGS, defaultAccountRows, defaultCategoryRows, missingSystemRows } from './lib/defaults.js';
@@ -303,12 +303,20 @@ export function LedgerProvider({ backend, user, children }) {
     const worthStocks = worth.rows.filter((r) => r.account.type === 'brokerage').reduce((x, r) => x + r.twd, 0);
     const worthNoStocks = Math.round((worth.total - worthStocks) * 100) / 100;
     const stockValueAt = (date) => stockValueByAccount(valuePositions(runFifo(tables.stock_trades, { until: date }), priceBook, fx, date));
+    const stockStart = new Map();
+    for (const t of tables.stock_trades) {
+      const cur = stockStart.get(t.brokerage_account_id);
+      if (!cur || t.trade_date < cur) stockStart.set(t.brokerage_account_id, t.trade_date);
+    }
+    const worthSeries = (monthKeys, includeStocks = true) => netWorthSeries({
+      accounts, txns: worthTxns, monthKeys, fx, stockValueAt, includeStocks, stockStart,
+    });
     const settings = { ...DEFAULT_SETTINGS, ...(tables.profiles[0]?.settings ?? {}) };
     const pending = tables.pending_items.filter((p) => p.status === 'pending').sort((a, b) => a.due_date.localeCompare(b.due_date));
     const txns = [...tables.transactions].sort((a, b) => Date.parse(b.occurred_at) - Date.parse(a.occurred_at));
     return {
       ...tables, transactions: txns, accounts, accById, tree, fx, priceBook, balances, positions, holdings,
-      stockValue, worth, worthStocks, worthNoStocks, stockValueAt, settings, pending, unsettled, worthTxns,
+      stockValue, worth, worthStocks, worthNoStocks, stockValueAt, worthSeries, settings, pending, unsettled, worthTxns,
       friendsOwe: accounts.find((a) => a.system_key === 'friends_owe'),
       feeCat: tree.bySystemKey('fee'), dividendCat: tree.bySystemKey('dividend'),
       rateFor: (currency, date) => fx.rateOn(currency, date),

@@ -5,7 +5,7 @@ import { Icon, Page, Section, Seg, back, categoryIcon, go, useAction, useUI } fr
 import { exceptionSource } from '../lib/categories.js';
 import { TxnList } from '../ui/TxnList.jsx';
 import { Donut, LineChart, MonthBars } from '../ui/charts.jsx';
-import { categoryBreakdown, counts, monthlyTrend, netWorthSeries, summarize, twdOf } from '../lib/ledger.js';
+import { categoryBreakdown, counts, monthlyTrend, summarize, twdOf } from '../lib/ledger.js';
 import { fmt } from '../lib/money.js';
 import { lastMonths, monthLabel, monthRange, shiftMonth, thisMonth } from '../lib/dates.js';
 
@@ -96,7 +96,7 @@ export default function Reports() {
     [data, kind, range.from.getTime(), range.to.getTime(), incl]);
   const months = lastMonths(thisMonth(), 12);
   const trend = useMemo(() => monthlyTrend(data.transactions, data.accById, months, incl), [data, incl]);
-  const worth = useMemo(() => netWorthSeries({ accounts: data.accounts, txns: data.worthTxns, monthKeys: months, fx: data.fx, stockValueAt: data.stockValueAt }), [data]);
+  const worth = useMemo(() => data.worthSeries(months, data.settings.worthIncludeStocks), [data]);
 
   const iconOf = (r) => (data.tree.byId.get(r.id) ? categoryIcon(data.tree, r.id) : 'tag');
 
@@ -138,7 +138,7 @@ export default function Reports() {
           <Section title="淨資產走勢" action={<button className="link small" onClick={() => go('worth')}>看更多</button>}>
             <div className="card">
               <LineChart data={worth} />
-              <p className="small muted" style={{ margin: '8px 0 0' }}>每月月底，含股票市值</p>
+              <p className="small muted" style={{ margin: '8px 0 0' }}>每月月底，{data.settings.worthIncludeStocks ? '含股票市值' : '不含股票'}</p>
             </div>
           </Section>
         </>

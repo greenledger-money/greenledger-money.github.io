@@ -141,7 +141,12 @@ export function netWorth({ accounts, balances, fx, stockValue }) {
 }
 
 /** 每月月底的淨資產（最多到今天） */
-export function netWorthSeries({ accounts, txns, monthKeys, fx, stockValueAt, now = new Date(), includeStocks = true }) {
+/**
+ * 每月月底淨資產。證券戶：有股票紀錄之後用市值；第一筆股票紀錄之前（例如只記了今天的期初持股），
+ * 用帳上金額（轉進去的錢＝成本）代替，不然以前的月份會像是錢憑空不見。
+ * stockStart: Map(證券戶 id → 第一筆股票紀錄日期)
+ */
+export function netWorthSeries({ accounts, txns, monthKeys, fx, stockValueAt, now = new Date(), includeStocks = true, stockStart = new Map() }) {
   const visible = accounts.filter((a) => !a.hidden);
   const bal = new Map(accounts.map((a) => [a.id, Number(a.opening_balance) || 0]));
   const sorted = [...txns].sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at));
@@ -157,7 +162,11 @@ export function netWorthSeries({ accounts, txns, monthKeys, fx, stockValueAt, no
     const stock = stockValueAt && includeStocks ? stockValueAt(endDay) : new Map();
     let total = 0;
     for (const a of visible) {
-      if (a.type === 'brokerage') { if (includeStocks) total += stock.get(a.id)?.twd ?? 0; continue; }
+      if (a.type === 'brokerage') {
+        if (!includeStocks) continue;
+        const start = stockStart.get(a.id);
+        if (start && endDay >= start) { total += stock.get(a.id)?.twd ?? 0; continue; }
+      }
       const rate = fx.rateOn(a.currency, endDay) ?? fx.latest(a.currency) ?? 0;
       total += bal.get(a.id) * rate;
     }

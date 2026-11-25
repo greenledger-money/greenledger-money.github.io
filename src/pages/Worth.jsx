@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
 import { Page, Section, Seg, Tile, accountIcon, back, useAction } from '../ui/kit.jsx';
 import { LineChart } from '../ui/charts.jsx';
-import { accountTypeLabel, netWorthSeries, orderedTypes } from '../lib/ledger.js';
+import { accountTypeLabel, orderedTypes } from '../lib/ledger.js';
 import { lastMonths, monthKey, thisMonth } from '../lib/dates.js';
 import { fmt } from '../lib/money.js';
 
@@ -32,9 +32,7 @@ export default function Worth() {
     const n = (Number(now.slice(0, 4)) - Number(first.slice(0, 4))) * 12 + Number(now.slice(5)) - Number(first.slice(5)) + 1;
     return lastMonths(now, Math.max(2, Math.min(n, 240)));
   }, [first]);
-  const series = useMemo(() => netWorthSeries({
-    accounts: data.accounts, txns: data.worthTxns, monthKeys: allMonths, fx: data.fx, stockValueAt: data.stockValueAt, includeStocks: inc,
-  }), [data, allMonths, inc]);
+  const series = useMemo(() => data.worthSeries(allMonths, inc), [data, allMonths, inc]);
   const shown = range === 'all' ? series : series.slice(-(range === '3y' ? 37 : 13));
   const now = inc ? data.worth.total : data.worthNoStocks;
   const at = (k) => series.find((s) => s.month === k)?.total ?? null;
