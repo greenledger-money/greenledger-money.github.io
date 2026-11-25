@@ -247,6 +247,10 @@ select t.as_user('bbbbbbbb-0000-0000-0000-000000000002');
 -- 朋友欠款：交易可以記「誰」
 insert into public.transactions (type, account_id, amount, category_id, counterparty) values ('expense','b0000000-0000-0000-0000-00000000000c', 10, 'cb000000-0000-0000-0000-000000000001', '小明');
 select t.ok((select count(*) from public.transactions where counterparty = '小明') = 1, '交易可以記對象');
+-- 外幣刷卡：原幣金額跟幣別要一起給
+insert into public.transactions (type, account_id, amount, category_id, orig_currency, orig_amount) values ('expense','b0000000-0000-0000-0000-00000000000c', 715, 'cb000000-0000-0000-0000-000000000001', 'JPY', 3280);
+select t.ok((select count(*) from public.transactions where orig_currency = 'JPY' and orig_amount = 3280) = 1, '交易可以記原本的外幣金額');
+select t.throws($$insert into public.transactions (type, account_id, amount, category_id, orig_currency) values ('expense','b0000000-0000-0000-0000-00000000000c', 1, 'cb000000-0000-0000-0000-000000000001', 'JPY')$$, 'orig_check', '只有幣別沒有外幣金額不行');
 
 -- ================= 未登入 =================
 select t.as_user(null);

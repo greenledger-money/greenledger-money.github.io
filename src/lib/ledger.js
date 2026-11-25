@@ -2,7 +2,7 @@
 // 原則：餘額不存，每次都從「期初餘額＋所有交易」重算 → 改舊帳會自動修正。
 
 import { round2 } from './money.js';
-import { monthKey, monthRange, ymd } from './dates.js';
+import { localDate, monthKey, monthRange, ymd } from './dates.js';
 
 export const ACCOUNT_TYPES = [
   { value: 'cash', label: '現金' },
@@ -213,4 +213,39 @@ export function buildFee({ transfer, fee, feeCategoryId }) {
     amount: round2(Number(fee)), fx_rate: transfer.fx_rate ?? 1, category_id: feeCategoryId,
     note: '轉帳手續費', is_exception: false, parent_id: transfer.id, source: transfer.source ?? 'manual',
   };
+}
+
+// ---------------------------------------------------------------------
+// 外幣
+
+/** 信用卡刷外幣預設的海外交易手續費（%）；其他帳戶 0 */
+export const foreignFeeOf = (account) => (account?.foreign_fee_pct != null ? Number(account.foreign_fee_pct)
+  : account?.type === 'credit_card' ? 1.5 : 0);
+
+/** 外幣 → 台幣：匯率 × (1 + 手續費%)，四捨五入到元 */
+export const foreignToTwd = (amount, rate, feePct = 0) => (amount > 0 && rate > 0 ? Math.round(amount * rate * (1 + feePct / 100)) : null);
+
+/**
+ * 外幣帳戶的「換匯成本」匯率（移動平均）：換進來花了多少台幣 ÷ 拿到多少外幣。
+ * 用在外幣現金花掉時 → 花掉的台幣＝當初換的台幣，不會因為匯率變動多算少算。
+ * 只算 until（YYYY-MM-DD，含）以前的紀錄，excludeId 是正在修改的那筆。沒有換匯紀錄回傳 null。
+ */
+export function costRate(txns, account, until, excludeId = null) {
+  if (!account || account.currency === 'TWD') return 1;
+  const list = txns
+    .filter((t) => t.id !== excludeId && (t.account_id === account.id || t.to_account_id === account.id) && localDate(t.occurred_at) <= until)
+    .sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at));
+  let qty = 0; let cost = 0; let seen = false;
+  for (const t of list) {
+    const inflow = t.type === 'transfer' ? t.to_account_id === account.id : t.type === 'income';
+    if (inflow) {
+      const q = Number(t.type === 'transfer' ? t.to_amount : t.amount);
+      const twd = Number(t.amount) * Number(t.fx_rate || 1); // 轉帳：轉出那邊付的台幣；收入：當天匯率
+      if (q > 0) { qty += q; cost += twd; seen = true; }
+    } else {
+      const q = Number(t.amount);
+      if (qty > 0) { const avg = cost / qty; qty -= q; cost -= q * avg; if (qty <= 1e-9) { qty = 0; cost = 0; } }
+    }
+  }
+  return seen && qty > 0 ? cost / qty : null;
 }

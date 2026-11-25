@@ -337,6 +337,12 @@ export function LedgerProvider({ backend, user, children }) {
         note: (form.note ?? '').trim(), is_exception: !!form.is_exception,
       };
       if (form.counterparty !== undefined || original?.counterparty) base.counterparty = form.counterparty || null;
+      // 台幣帳戶付外幣：留原本的外幣金額
+      const orig = form.type !== 'transfer' && form.orig_currency && Number(form.orig_amount) > 0;
+      if (orig || original?.orig_currency) {
+        base.orig_currency = orig ? form.orig_currency : null;
+        base.orig_amount = orig ? round2(Number(form.orig_amount)) : null;
+      }
       if (form.type === 'transfer') {
         Object.assign(base, { to_account_id: form.to_account_id, to_amount: round2(Number(form.to_amount)), to_fx_rate: Number(form.to_fx_rate) || 1, category_id: null });
       } else {
@@ -380,6 +386,10 @@ export function LedgerProvider({ backend, user, children }) {
         name: form.name.trim(), type: form.type, currency: form.currency, icon: form.icon || null,
         opening_balance: round2(Number(form.opening_balance) || 0), hidden: !!form.hidden,
       };
+      // 海外交易手續費：空白＝預設（信用卡 1.5%）
+      const fee = form.foreign_fee_pct === '' || form.foreign_fee_pct == null ? null : Number(form.foreign_fee_pct);
+      if (fee != null && !(fee >= 0 && fee <= 10)) throw new Error('海外交易手續費請填 0～10');
+      if (form.type === 'credit_card' || original?.foreign_fee_pct != null) row.foreign_fee_pct = form.type === 'credit_card' ? fee : null;
       if (original) return updateRow('accounts', original.id, row);
       return (await insertRows('accounts', [{ ...row, sort_order: d.accounts.length }]))[0];
     }

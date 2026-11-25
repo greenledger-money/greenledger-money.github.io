@@ -46,6 +46,7 @@ export function TxnRow({ t, accountId }) {
           {t.parent_id && <span className="badge">手續費</span>}
           {future && <span className="badge warn">未到</span>}
           {cur !== 'TWD' && t.type !== 'transfer' && <span className="small muted num">≈{fmt(twdOf(t))}</span>}
+          {t.orig_currency && <span className="small muted num">{fmt(Number(t.orig_amount), t.orig_currency)}</span>}
         </span>
       </div>
     </button>

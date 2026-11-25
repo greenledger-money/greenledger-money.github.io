@@ -7,6 +7,9 @@ import { evaluate, hasOperator, press } from '../lib/calc.js';
 import { fmt, round2 } from '../lib/money.js';
 import { addDays, fromInputDateTime, toInputDateTime } from '../lib/dates.js';
 import { exceptionSource } from '../lib/categories.js';
+import { costRate, foreignFeeOf, foreignToTwd } from '../lib/ledger.js';
+
+const CUR_NAMES = { TWD: '台幣', JPY: '日圓', USD: '美元', KRW: '韓元', EUR: '歐元', THB: '泰銖', HKD: '港幣', CNY: '人民幣', SGD: '新幣', GBP: '英鎊', AUD: '澳幣', CAD: '加幣', CHF: '瑞郎', NZD: '紐幣' };
 
 // 鍵盤：5 欄，數字在左、運算在右（像 CWMoney）
 const PAD = [
@@ -69,7 +72,8 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
   const src = original ?? initial;
   const [type, setType] = useState(src.type ?? 'expense');
   const [ex, setEx] = useState({
-    amount: src.amount != null ? String(Number(src.amount)) : '',
+    amount: original?.orig_currency ? String(Number(original.orig_amount)) : src.amount != null ? String(Number(src.amount)) : '',
+    twd: original?.orig_currency ? String(Number(original.amount)) : '',
     mine: '',
     fee: feeChild ? String(Number(feeChild.amount)) : '',
     to_amount: original?.to_amount != null ? String(Number(original.to_amount)) : '',
@@ -87,7 +91,9 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
   const [who, setWho] = useState(src.counterparty ?? '');
   const [fxRate, setFxRate] = useState(original ? String(Number(original.fx_rate)) : '');
   const [toFxRate, setToFxRate] = useState(original?.to_fx_rate ? String(Number(original.to_fx_rate)) : '');
-  const [manual, setManual] = useState({ fx: !!original, toFx: !!original, toAmount: !!original });
+  const [manual, setManual] = useState({ fx: !!original, toFx: !!original, toAmount: !!original, twd: !!original?.orig_currency });
+  // 台幣帳戶（刷卡、台幣錢包）付外幣：選了外幣就打外幣金額，自動換算台幣；選過的幣別會記住（出國時不用每筆重選）
+  const [payCur, setPayCur] = useState(original ? (original.orig_currency ?? null) : (remember.get('tripCurrency') || null));
   const [error, setError] = useState('');
   const [tplName, setTplName] = useState(null);
   const [tab, setTab] = useState(src.type ?? 'expense');
@@ -112,8 +118,19 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
 
   // 外幣：自動帶當天匯率（當天沒有就用最近一天），可以手動改
   const autoRate = useMemo(() => data.fx.lookup(currency, date), [data.fx, currency, date]);
+  // 外幣現金花掉：用換匯成本（當初換的台幣 ÷ 拿到的外幣），花掉的台幣＝當初付的台幣
+  const cost = useMemo(() => (currency !== 'TWD' && type === 'expense' ? costRate(data.transactions, acc, date, original?.id) : null),
+    [data.transactions, acc, currency, type, date, original?.id]);
+  const foreignPay = type !== 'transfer' && currency === 'TWD' && payCur && payCur !== 'TWD' ? payCur : null;
+  const payRate = useMemo(() => (foreignPay ? (data.fx.lookup(foreignPay, date)?.rate ?? data.fx.latest(foreignPay)) : null), [data.fx, foreignPay, date]);
+  const feePct = type === 'expense' ? foreignFeeOf(acc) : 0;
+  const twdAuto = foreignPay ? foreignToTwd(amount, payRate, feePct) : null;
+  const twdAmount = foreignPay ? (manual.twd ? evaluate(ex.twd) : twdAuto) : null;
   const autoToRate = useMemo(() => data.fx.lookup(toCurrency, date), [data.fx, toCurrency, date]);
-  useEffect(() => { if (!manual.fx) setFxRate(currency === 'TWD' ? '1' : autoRate ? String(autoRate.rate) : ''); }, [currency, autoRate, manual.fx]);
+  useEffect(() => {
+    if (manual.fx) return;
+    setFxRate(currency === 'TWD' ? '1' : cost ? String(Math.round(cost * 1e8) / 1e8) : autoRate ? String(autoRate.rate) : '');
+  }, [currency, autoRate, cost, manual.fx]);
   useEffect(() => { if (!manual.toFx) setToFxRate(toCurrency === 'TWD' ? '1' : autoToRate ? String(autoToRate.rate) : ''); }, [toCurrency, autoToRate, manual.toFx]);
   useEffect(() => {
     if (type !== 'transfer' || manual.toAmount) return;
@@ -139,6 +156,8 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
     setError('');
     setEx((e) => ({ ...e, [active]: press(e[active], k) }));
     if (active === 'to_amount') setManual((m) => ({ ...m, toAmount: true }));
+    if (active === 'twd') setManual((m) => ({ ...m, twd: true }));
+    if (active === 'amount' && foreignPay) setManual((m) => ({ ...m, twd: false })); // 改了外幣金額 → 台幣重算
   };
   const finishKeypad = () => {
     setEx((e) => { const v = evaluate(e[active]); return v == null ? e : { ...e, [active]: String(v) }; });
@@ -154,6 +173,7 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
       if (toAcc.id === acc.id) throw new Error('轉出和轉入不能是同一個帳戶');
     }
     if (!(Number(fxRate) > 0)) throw new Error(`請填 ${currency} 匯率（找不到當天或之前的匯率）`);
+    if (foreignPay && !(twdAmount > 0)) throw new Error(`找不到 ${foreignPay} 匯率，請在下面填台幣金額`);
     if (type === 'transfer' && !(Number(toFxRate) > 0)) throw new Error(`請填 ${toCurrency} 匯率`);
     const toAmount = type === 'transfer' ? (crossCurrency ? evaluate(ex.to_amount) : amount) : null;
     if (type === 'transfer' && !(toAmount > 0)) throw new Error('請填對方收到的金額');
@@ -164,12 +184,19 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
       pending_item_id: initial.pending_item_id, source: initial.source,
       counterparty: (split || friendsXfer) ? (who.trim() || null) : null,
     };
+    if (foreignPay) Object.assign(form, { amount: twdAmount, fx_rate: 1, orig_currency: foreignPay, orig_amount: amount });
     if (split) {
       const mine = evaluate(ex.mine);
       if (mine == null || mine < 0) throw new Error('請輸入自己的部分（沒吃就填 0）');
       if (mine > amount) throw new Error('自己的部分不能大於總額');
       if (!data.friendsOwe) throw new Error('找不到「朋友欠我」帳戶');
       form.split = { mine };
+      if (foreignPay) {
+        // 分帳＋外幣：自己的部分照同樣比例換成台幣，原幣金額寫進備註
+        form.split = { mine: Math.round((mine * twdAmount) / amount) };
+        form.note = `${note}${note ? ' ' : ''}（${foreignPay} ${amount}）`;
+        form.orig_currency = null; form.orig_amount = null;
+      }
     }
     return form;
   }
@@ -178,7 +205,10 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
     let form;
     try { form = buildForm(); } catch (e) { setError(e.message); return; }
     const ok = await run(() => actions.saveTxn(form, original), original ? '已更新' : split ? '已記帳（分帳）' : '已記帳');
-    if (ok) onClose(true);
+    if (ok) {
+      if (!original && type !== 'transfer' && currency === 'TWD') remember.set('tripCurrency', foreignPay ?? '');
+      onClose(true);
+    }
   }
 
   async function remove() {
@@ -277,6 +307,7 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
       ) : (
         <>
           {type !== 'transfer' ? (
+            <>
             <div className="ehero">
               <button type="button" className="catcard" onClick={() => { setActive(null); setPickCat(true); }} aria-label={`分類：${leaf ? data.tree.path(leaf.id) : '未選'}`}>
                 <Tile name={categoryIcon(data.tree, categoryId)} tone={type === 'income' ? 'income' : ''} round size={52} />
@@ -284,12 +315,35 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
                 <b className="cc-leaf">{leaf ? leaf.name : '選擇分類'}</b>
                 <Icon name="chev" className="chev down" />
               </button>
-              <button type="button" className={`hamt ${active === 'amount' ? 'active' : ''}`} onClick={() => setActive('amount')} aria-label="金額">
-                <span className="cur">{split ? `總額 · ${currency}` : currency}</span>
-                <span className="expr num">{hasOperator(ex.amount) ? ex.amount.replace(/-/g, '−') : ''}</span>
-                <span className={`val num ${type}`}>{fmt(amount ?? 0, currency, { exact: true })}</span>
-              </button>
+              <div className="hamt-wrap">
+                <button type="button" className={`hamt ${active === 'amount' ? 'active' : ''}`} onClick={() => setActive('amount')} aria-label="金額">
+                  <span className="cur">{split ? '總額' : ''}</span>
+                  <span className="expr num">{hasOperator(ex.amount) ? ex.amount.replace(/-/g, '−') : ''}</span>
+                  <span className={`val num ${type}`}>{fmt(amount ?? 0, foreignPay ?? currency, { exact: true })}</span>
+                </button>
+                {currency === 'TWD' ? (
+                  <label className={`curchip ${foreignPay ? 'on' : ''}`}>
+                    {foreignPay ? `${CUR_NAMES[foreignPay] ?? foreignPay} ${foreignPay}` : '台幣'}<Icon name="chev" className="caret" />
+                    <select aria-label="幣別" value={foreignPay ?? 'TWD'} onChange={(e) => { setPayCur(e.target.value === 'TWD' ? null : e.target.value); setManual((m) => ({ ...m, twd: false })); }}>
+                      {Object.entries(CUR_NAMES).map(([c, n]) => <option key={c} value={c}>{n} {c}</option>)}
+                    </select>
+                  </label>
+                ) : <span className="curchip static">{CUR_NAMES[currency] ?? currency} {currency}</span>}
+              </div>
             </div>
+            {foreignPay && (
+              <button type="button" className={`fxline ${active === 'twd' ? 'active' : ''}`} onClick={() => { setEx((e) => ({ ...e, twd: '' })); setActive('twd'); }} aria-label="台幣金額（帳單出來可以改）">
+                <span className="grow">
+                  {manual.twd ? '台幣（自己填的）' : `匯率 ${payRate ? Math.round(payRate * 10000) / 10000 : '—'}${feePct ? `＋海外手續費 ${feePct}%` : ''}`}
+                </span>
+                <b className="num">{active === 'twd' && ex.twd ? fmt(evaluate(ex.twd) ?? 0) : twdAmount != null ? `≈ ${fmt(twdAmount)}` : '—'}</b>
+                <Icon name="chev" className="chev" />
+              </button>
+            )}
+            {currency !== 'TWD' && type === 'expense' && cost && !manual.fx && amount > 0 && (
+              <div className="fxline static"><span className="grow">用換匯成本 1 {currency} ＝ {Math.round(cost * 10000) / 10000} 元</span><b className="num">≈ {fmt(amount * cost)}</b></div>
+            )}
+            </>
           ) : (
             <div className="xfer">
               <div className="xacc">
@@ -316,10 +370,10 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
 
           {split && (
             <div className="formlist">
-              <div className="frow"><span className="lbl">自己的部分</span><div className="ctrl"><MiniAmount label="自己的部分" expr={ex.mine} active={active === 'mine'} onFocus={() => setActive('mine')} currency={currency} placeholder="沒吃就填 0" /></div></div>
+              <div className="frow"><span className="lbl">自己的部分</span><div className="ctrl"><MiniAmount label="自己的部分" expr={ex.mine} active={active === 'mine'} onFocus={() => setActive('mine')} currency={foreignPay ?? currency} placeholder="沒吃就填 0" /></div></div>
               {whoRow}
               <div className="frow small muted" style={{ minHeight: 40 }}>
-                支出 {fmt(evaluate(ex.mine) ?? 0, currency)}，{fmt(Math.max(0, (amount ?? 0) - (evaluate(ex.mine) ?? 0)), currency)} 記到「朋友欠我」
+                支出 {fmt(evaluate(ex.mine) ?? 0, foreignPay ?? currency)}，{fmt(Math.max(0, (amount ?? 0) - (evaluate(ex.mine) ?? 0)), foreignPay ?? currency)} 記到「朋友欠我」
               </div>
             </div>
           )}
@@ -388,7 +442,7 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
             </div>
           )}
 
-          {currency !== 'TWD' && autoRate && !manual.fx && autoRate.date !== date && (
+          {currency !== 'TWD' && !cost && autoRate && !manual.fx && autoRate.date !== date && (
             <p className="small muted">無當日匯率，採用 {autoRate.date} 匯率。</p>
           )}
           {error && <div className="error" role="alert">{error}</div>}

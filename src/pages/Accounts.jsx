@@ -50,6 +50,11 @@ export function AccountSheet({ original, onClose }) {
             <input className="input num" inputMode="decimal" value={f.opening_balance} onChange={set('opening_balance')} />
           </Field>
         </div>
+        {f.type === 'credit_card' && f.currency === 'TWD' && (
+          <Field label="海外交易手續費（%）" hint="刷外幣時換算台幣會加上，一般是 1.5%">
+            <input className="input num" inputMode="decimal" placeholder="1.5" value={f.foreign_fee_pct ?? ''} onChange={set('foreign_fee_pct')} />
+          </Field>
+        )}
         {f.type === 'brokerage' && <div className="notice">淨資產以股票市值計算。</div>}
         <div className="row-flex"><span className="grow">隱藏<div className="small muted">不顯示在帳戶列表和記帳選單、不計入淨資產；收支照樣算進報表</div></span><Toggle label="隱藏" checked={f.hidden} onChange={set('hidden')} /></div>
         {err && <div className="error">{err}</div>}

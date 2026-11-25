@@ -424,3 +424,17 @@ button.card.goal { display: grid; gap: 8px; width: 100%; border: 0; text-align: 
 .pgrid button.now { border-color: var(--income); }
 .pgrid button[aria-pressed="true"] { background: var(--income); border-color: var(--income); color: #fff; }
 .pgrid button:disabled { opacity: .35; }
+
+/* 外幣記帳 */
+.hamt-wrap { display: grid; justify-items: end; gap: 4px; min-width: 0; }
+.curchip { position: relative; display: inline-flex; align-items: center; gap: 2px; font-size: 13px; font-weight: 600; color: var(--ink-2);
+  background: var(--surface-2); border-radius: 999px; padding: 4px 10px; }
+.curchip.on { background: var(--income); color: #fff; }
+.curchip.static { background: none; padding: 0 2px; color: var(--muted); }
+.curchip .caret { width: 12px; height: 12px; transform: rotate(90deg); }
+.curchip select { position: absolute; inset: 0; opacity: 0; font-size: 16px; }
+.fxline { display: flex; align-items: center; gap: 8px; width: 100%; border: 1px dashed var(--line); border-radius: 12px; background: var(--surface-2);
+  padding: 8px 12px; font: inherit; font-size: 14px; color: var(--ink-2); text-align: left; }
+.fxline.active { border-color: var(--income); border-style: solid; }
+.fxline b { color: var(--ink); }
+.fxline .chev { width: 14px; height: 14px; color: var(--muted); }

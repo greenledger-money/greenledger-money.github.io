@@ -41,6 +41,7 @@ create table public.accounts (
   hidden          boolean not null default false,
   sort_order      int not null default 0,
   icon            text check (icon is null or icon ~ '^[A-Za-z0-9]{1,24}$'),   -- 自己選的圖示，空著就照類型
+  foreign_fee_pct numeric(5,2) check (foreign_fee_pct between 0 and 10),         -- 信用卡海外交易手續費 %
   system_key      text check (system_key in ('friends_owe')),   -- 系統帳戶：「朋友欠我」
   created_at      timestamptz not null default now(),
   unique (id, user_id),
@@ -124,6 +125,8 @@ create table public.transactions (
   account_id      uuid not null,
   amount          numeric(18,2) not null check (amount >= 0),       -- 帳戶幣別
   fx_rate         numeric(18,8) not null default 1 check (fx_rate > 0),  -- 1 單位帳戶幣別 = ? 台幣
+  orig_currency   char(3) check (orig_currency ~ '^[A-Z]{3}$'),       -- 用台幣帳戶付外幣：原本的幣別
+  orig_amount     numeric(18,2) check (orig_amount >= 0),             -- 原本的外幣金額（amount 是換算後的台幣）
   to_account_id   uuid,
   to_amount       numeric(18,2) check (to_amount >= 0),             -- 轉入帳戶收到的金額（轉入帳戶幣別）
   to_fx_rate      numeric(18,8) check (to_fx_rate > 0),
@@ -146,7 +149,8 @@ create table public.transactions (
   check ((type = 'transfer' and to_account_id is not null and to_account_id <> account_id
           and to_amount is not null and to_fx_rate is not null and category_id is null)
       or (type <> 'transfer' and to_account_id is null and to_amount is null
-          and to_fx_rate is null and category_id is not null))
+          and to_fx_rate is null and category_id is not null)),
+  constraint transactions_orig_check check ((orig_currency is null) = (orig_amount is null))
 );
 create index transactions_user_time on public.transactions (user_id, occurred_at);
 create index transactions_account    on public.transactions (account_id);
