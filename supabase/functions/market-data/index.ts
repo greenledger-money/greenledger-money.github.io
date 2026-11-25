@@ -1,7 +1,8 @@
 // 股價與匯率更新（Supabase Edge Function）。由資料庫排程（pg_cron）定時呼叫：
 //   盤中：開盤時間每 10 分鐘 { mode: 'intraday' }；每日：收盤後 { mode: 'daily' }
+//   補歷史（手動）：{ mode: 'history' } → 從第一筆股票交易開始的每日收盤價與美元匯率
 // 實際邏輯跟 GitHub Actions 共用 update-market-data.mjs（部署時從 scripts/ 複製過來）。
-import { runUpdate } from './update-market-data.mjs';
+import { runHistory, runUpdate } from './update-market-data.mjs';
 
 const URL_ = Deno.env.get('SUPABASE_URL')!;
 const KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -27,7 +28,9 @@ Deno.serve(async (req) => {
     error: (...a: unknown[]) => lines.push(`✗ ${a.join(' ')}`),
   };
   try {
-    const { failures } = await runUpdate({ base: URL_, key: KEY, intraday: mode === 'intraday', log });
+    const { failures } = mode === 'history'
+      ? await runHistory({ base: URL_, key: KEY, log })
+      : await runUpdate({ base: URL_, key: KEY, intraday: mode === 'intraday', log });
     console.log(`[${mode}] ${lines.join(' | ')}`);
     return Response.json({ ok: failures === 0, failures, lines });
   } catch (e) {

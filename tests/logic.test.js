@@ -261,6 +261,12 @@ describe('已實現損益記進月收支（CW 記法）', () => {
     const after = apply([settleTx], plan);
     expect(computeBalances([{ id: 'bank', opening_balance: 0 }], after, null).get('bank')).toBe(59735);
   });
+  test('匯入的歷史賣出（損益已在 CW 記過）：不記損益、交割轉帳不動；之前自動記的會刪掉', () => {
+    const ext = { ...sell, pnl_external: true, settlement_account_id: null, settlement_txn_id: null };
+    expect(realizedTxnPlan({ trades: [buy, ext], txns: [], ...ctx })).toEqual({ insert: [], update: [], remove: [], link: [] });
+    const old = { id: 'p', type: 'income', amount: 1 };
+    expect(realizedTxnPlan({ trades: [buy, { ...ext, pnl_txn_id: 'p' }], txns: [old], ...ctx }).remove).toEqual(['p']);
+  });
   test('已經記好就不動；改了以前的買進價，兩筆一起改；變成虧損就改成支出', () => {
     const p1 = realizedTxnPlan({ trades: [buy, sell], txns: [settleTx], ...ctx });
     const linked = { ...sell, pnl_txn_id: p1.insert[0].id };

@@ -110,3 +110,13 @@ test('Supabase 函式裡的程式跟 scripts/ 的一樣（改了要一起更新�
   const b = fs.readFileSync(new URL('../supabase/functions/market-data/update-market-data.mjs', import.meta.url), 'utf8');
   expect(b).toBe(a);
 });
+
+test('Yahoo 歷史日線：日期用交易所時區、跳過空值、同一天只留一筆', async () => {
+  const { parseYahooHistory } = await import('../scripts/update-market-data.mjs');
+  const json = { chart: { result: [{ timestamp: [1772802000, 1772888400, 1772974800], indicators: { quote: [{ close: [101.23456, null, 103] }] } }] } };
+  const rows = parseYahooHistory(json, 'US', 'SOXX', 'America/New_York');
+  expect(rows).toEqual([
+    { market: 'US', symbol: 'SOXX', price_date: '2026-03-06', close: 101.2346, name: '' },
+    { market: 'US', symbol: 'SOXX', price_date: '2026-03-08', close: 103, name: '' },
+  ]);
+});

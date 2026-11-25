@@ -102,6 +102,24 @@ export function parseYahooChart(json, symbol) {
   return null;
 }
 
+/**
+ * Yahoo chart JSON（一段期間的日線）→ 每天的收盤價。收盤價已經依分割調整（例如 SOXX 一拆三之前的價格會 ÷3）
+ * tz：交易所時區，用來決定日期
+ */
+export function parseYahooHistory(json, market, symbol, tz) {
+  const r = json?.chart?.result?.[0];
+  const ts = r?.timestamp ?? [];
+  const closes = r?.indicators?.quote?.[0]?.close ?? [];
+  const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
+  const out = new Map();
+  for (let i = 0; i < ts.length; i++) {
+    const c = Number(closes[i]);
+    if (!(c > 0)) continue;
+    out.set(fmt.format(new Date(ts[i] * 1000)), Math.round(c * 10000) / 10000);
+  }
+  return [...out].map(([price_date, close]) => ({ market, symbol, price_date, close, name: '' }));
+}
+
 /** 現在哪些市場開盤中（台股 09:00–13:30 台北；美股 09:30–16:00 紐約），多抓 10 分鐘收尾 */
 export function openMarkets(now = new Date()) {
   const parts = (tz) => {
@@ -262,6 +280,58 @@ export async function runUpdate({ base: rawBase, key, intraday = false, fxFrom =
     console.log(`補抓匯率：${n} 天`);
   }
 
+  return { failures };
+}
+
+/**
+ * 補歷史：所有買賣過的股票，從第一筆交易開始的每日收盤價；美元匯率也一起補。
+ * 已經有的日期不覆蓋（每天抓的正式資料優先）。
+ */
+export async function runHistory({ base: rawBase, key, log = console }) {
+  const base = rawBase?.replace(/\/$/, '');
+  if (!base || !key) throw new Error('缺少 SUPABASE_URL 或 SUPABASE_SECRET_KEY');
+  const console = log;
+  const headers = { apikey: key, 'Content-Type': 'application/json' };
+  if (key.startsWith('eyJ')) headers.Authorization = `Bearer ${key}`;
+  const rest = async (path, init = {}) => {
+    const res = await fetch(`${base}/rest/v1/${path}`, { ...init, headers: { ...headers, ...init.headers } });
+    if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error(`Supabase ${res.status}：${b.code ?? ''} ${b.message ?? ''}`.trim()); }
+    return res.status === 204 ? null : res.json().catch(() => null);
+  };
+  const insertNew = async (table, conflict, rows) => {
+    for (let i = 0; i < rows.length; i += 500) {
+      await rest(`${table}?on_conflict=${conflict}`, { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify(rows.slice(i, i + 500)) });
+    }
+  };
+  const get = async (url) => {
+    const res = await fetch(url, { headers: { 'User-Agent': 'ledger-app-price-updater' } });
+    if (!res.ok) throw new Error(`${new URL(url).host} → ${res.status}`);
+    return res.json();
+  };
+  const trades = (await rest('stock_trades?select=market,symbol,trade_date&order=trade_date')) ?? [];
+  if (!trades.length) { console.log('沒有股票紀錄，略過'); return { failures: 0 }; }
+  const from = Math.floor(Date.parse(`${trades[0].trade_date}T00:00:00Z`) / 1000) - 14 * 86400;
+  const to = Math.floor(Date.now() / 1000);
+  const url = (y) => `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(y)}?period1=${from}&period2=${to}&interval=1d`;
+  let failures = 0; let ok = 0;
+  const wanted = [...new Map(trades.map((t) => [`${t.market}|${t.symbol}`, t])).values()];
+  for (const t of wanted) {
+    const tries = t.market === 'TW' ? [`${t.symbol}.TW`, `${t.symbol}.TWO`] : [t.symbol];
+    let rows = [];
+    for (const y of tries) {
+      try { rows = parseYahooHistory(await get(url(y)), t.market, t.symbol, t.market === 'TW' ? 'Asia/Taipei' : 'America/New_York'); } catch { rows = []; }
+      if (rows.length) break;
+    }
+    if (rows.length) { await insertNew('stock_prices', 'market,symbol,price_date', rows); ok++; } else failures++;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  console.log(`歷史股價：${ok}/${wanted.length} 檔`);
+  try {
+    const fx = parseYahooHistory(await get(url('TWD=X')), 'FX', 'USD', 'Asia/Taipei')
+      .map((r) => ({ currency: 'USD', rate_date: r.price_date, rate: r.close }));
+    await insertNew('fx_rates', 'currency,rate_date', fx);
+    console.log(`歷史美元匯率：${fx.length} 天`);
+  } catch (e) { failures++; console.error('歷史匯率失敗：', e.message); }
   return { failures };
 }
 

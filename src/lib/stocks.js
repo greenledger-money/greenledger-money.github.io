@@ -200,6 +200,8 @@ export function realizedTxnPlan({ trades, txns, gainCatId, lossCatId, rateFor, a
     if (s.side !== 'sell') continue;
     const r = realized.get(s.id);
     const cur = s.pnl_txn_id ? txById.get(s.pnl_txn_id) : null;
+    // 損益已經另外記過（匯入的歷史成交，CW 裡記在「工作收入-股票」）：不重複記
+    if (s.pnl_external) { if (cur) plan.remove.push(cur.id); continue; }
     const settleTx = s.settlement_txn_id ? txById.get(s.settlement_txn_id) : null;
     const pnl = r ? round2(r.pnl) : 0;
     const net = tradeNetAmount(s);

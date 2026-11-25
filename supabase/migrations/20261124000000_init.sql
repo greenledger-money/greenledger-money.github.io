@@ -191,7 +191,7 @@ create table public.stock_trades (
   side                  public.trade_side not null,    -- opening＝期初持股（當成一批買進，不產生交割）
   trade_date            date not null,
   settle_date           date,
-  shares                numeric(18,4) not null check (shares > 0),
+  shares                numeric(18,6) not null check (shares > 0),
   price                 numeric(18,6) not null check (price >= 0),
   fee                   numeric(18,2) not null default 0 check (fee >= 0),
   tax                   numeric(18,2) not null default 0 check (tax >= 0),
@@ -200,6 +200,7 @@ create table public.stock_trades (
   settle_amount         numeric(18,2) check (settle_amount >= 0),  -- 交割戶實際扣/入金額（交割戶幣別）
   settlement_txn_id     uuid,
   pnl_txn_id            uuid,                          -- 賣出的已實現損益（記在證券戶的收入／支出，算進月收支）
+  pnl_external          boolean not null default false, -- 損益已另外記過（匯入的歷史成交），不自動記
   order_no              text,                          -- 委託書號
   pending_item_id       uuid unique,
   note                  text not null default '' check (length(note) <= 500),
