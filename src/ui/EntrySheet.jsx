@@ -1,25 +1,36 @@
 // 記一筆（新增／修改）：支出、收入、轉帳；內建計算機鍵盤；分帳；轉帳手續費；外幣自動帶匯率
 import { useEffect, useMemo, useState } from 'react';
 import { useLedger, remember } from '../store.jsx';
-import { Icon, Seg, Sheet, Toggle, useAction, useUI } from './kit.jsx';
-import { AccountSelect, CategoryButton } from './pickers.jsx';
+import { Icon, Sheet, Tile, Toggle, accountIcon, categoryIcon, useAction, useUI } from './kit.jsx';
+import { AccountSelect, CategoryPicker } from './pickers.jsx';
 import { evaluate, hasOperator, press } from '../lib/calc.js';
 import { fmt, round2 } from '../lib/money.js';
-import { fromInputDateTime, toInputDateTime } from '../lib/dates.js';
+import { addDays, fromInputDateTime, toInputDateTime } from '../lib/dates.js';
 
-const KEYS = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '-', '.', '0', '⌫', '+'];
+// 鍵盤：5 欄，數字在左、運算在右（像 CWMoney）
+const PAD = [
+  ['7', '8', '9', '×', '÷'],
+  ['4', '5', '6', '-', 'C'],
+  ['1', '2', '3', '+', '⌫'],
+];
+const LABEL = { '-': '−', C: 'AC', '⌫': '⌫' };
+const ARIA = { '⌫': '刪除', C: '清除', '-': '減', '+': '加', '×': '乘', '÷': '除' };
 
 export function Keypad({ onKey, onDone }) {
   return (
     <div className="keypad" role="group" aria-label="計算機">
-      {KEYS.map((k) => (
-        <button type="button" key={k} className={/[÷×+\-]/.test(k) ? 'op' : ''} onClick={() => onKey(k)} aria-label={k === '⌫' ? '刪除' : k}>
-          {k === '-' ? '−' : k}
-        </button>
-      ))}
-      <button type="button" className="op" onClick={() => onKey('C')}>C</button>
-      <button type="button" className="op" onClick={() => onKey('=')}>=</button>
-      <button type="button" className="ok" style={{ gridColumn: 'span 2' }} onClick={onDone}>完成</button>
+      <div className="kp-bar"><button type="button" className="kp-hide" onClick={onDone} aria-label="收起鍵盤"><Icon name="chev" /></button></div>
+      <div className="kp-grid">
+        {PAD.flat().map((k) => (
+          <button type="button" key={k} data-k={k} className={/^\d$/.test(k) ? 'num' : 'op'} onClick={() => onKey(k)} aria-label={ARIA[k] ?? k}>
+            {k === '⌫' ? <Icon name="arrowLeft" /> : (LABEL[k] ?? k)}
+          </button>
+        ))}
+        <button type="button" className="num" data-k="00" onClick={() => onKey('00')}>00</button>
+        <button type="button" className="num" data-k="0" onClick={() => onKey('0')}>0</button>
+        <button type="button" className="num" data-k="." onClick={() => onKey('.')} aria-label="小數點">.</button>
+        <button type="button" className="ok" onClick={onDone}>OK</button>
+      </div>
     </div>
   );
 }
@@ -75,6 +86,9 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
   const [manual, setManual] = useState({ fx: !!original, toFx: !!original, toAmount: !!original });
   const [error, setError] = useState('');
   const [tplName, setTplName] = useState(null);
+  const [tab, setTab] = useState(src.type ?? 'expense');
+  const [advanced, setAdvanced] = useState(false);
+  const [pickCat, setPickCat] = useState(false);
 
   const acc = accById.get(accountId);
   const toAcc = accById.get(toAccountId);
@@ -190,97 +204,173 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
     );
   }
 
+  const chain = categoryId ? data.tree.chain(categoryId) : [];
+  const leaf = chain[chain.length - 1];
+  const parentPath = chain.slice(0, -1).map((c) => c.name).join('-');
+  const [y, mo, d] = date.split('-');
+  const shiftDay = (n) => setWhen(`${addDays(date, n)}${when.slice(10)}`);
+  const balanceOf = (a) => (a ? fmt(data.balances.get(a.id), a.currency, { exact: true }) : '');
+  const canTemplate = !original && !initial.pending_item_id;
+  const showAdvanced = advanced || split || (tplName != null);
+  const toAmountShown = crossCurrency ? evaluate(ex.to_amount) : amount;
+
+  const applyTemplate = (t) => {
+    changeType(t.type);
+    if (t.account_id && accById.get(t.account_id)) setAccountId(t.account_id);
+    setToAccountId(t.to_account_id ?? null);
+    if (t.type !== 'transfer') setCategoryId(t.category_id ?? null);
+    setEx((e) => ({ ...e, amount: t.amount != null && t.amount !== '' ? String(Number(t.amount)) : e.amount }));
+    if (t.note) setNote(t.note);
+    setIsException(!!t.is_exception);
+    setTab(t.type);
+    if (t.amount == null || t.amount === '') setActive('amount');
+  };
+
   return (
     <Sheet title={title} onClose={() => onClose(false)} onSave={save} saving={busy} full>
-      <Seg label="類型" value={type} onChange={changeType} options={[{ value: 'expense', label: '支出' }, { value: 'income', label: '收入' }, { value: 'transfer', label: '轉帳' }]} />
-
-      <button type="button" className={`amount-box ${active === 'amount' ? 'active' : ''}`} onClick={() => setActive('amount')} aria-label="金額">
-        <span className="lbl"><span>{split ? '總額（幫大家付的）' : '金額'}</span><span>{currency}</span></span>
-        <span className="expr num">{hasOperator(ex.amount) ? ex.amount.replace(/-/g, '−') : ''}</span>
-        <span className={`val num ${type === 'expense' ? 'expense' : type === 'income' ? 'income' : ''}`}>{fmt(amount ?? 0, currency, { exact: true })}</span>
-      </button>
-
-      {split && (
-        <div className="formlist">
-          <div className="frow"><span className="lbl">自己的部分</span><div className="ctrl"><MiniAmount label="自己的部分" expr={ex.mine} active={active === 'mine'} onFocus={() => setActive('mine')} currency={currency} placeholder="沒吃就填 0" /></div></div>
-          <div className="frow small muted" style={{ minHeight: 40 }}>
-            記成：支出 {fmt(evaluate(ex.mine) ?? 0, currency)}，另外 {fmt(Math.max(0, (amount ?? 0) - (evaluate(ex.mine) ?? 0)), currency)} 轉進「朋友欠我」
-          </div>
-        </div>
-      )}
-
-      <div className="formlist">
-        <div className="frow">
-          <label htmlFor="acc">{type === 'transfer' ? '轉出' : '帳戶'}</label>
-          <div className="ctrl"><AccountSelect id="acc" className="" value={accountId} onChange={(v) => { setAccountId(v); setManual((m) => ({ ...m, fx: false })); }} /></div>
-        </div>
-        {type === 'transfer' && (
-          <div className="frow">
-            <span className="lbl swap-lbl">
-              <label htmlFor="to">轉入</label>
-              <button type="button" className="swapbtn" onClick={swapAccounts} disabled={!toAccountId} aria-label="交換轉出和轉入帳戶" title="交換轉出、轉入">
-                <Icon name="swapV" />
-              </button>
-            </span>
-            <div className="ctrl"><AccountSelect id="to" className="" value={toAccountId} placeholder="選擇轉入帳戶" filter={(a) => a.id !== accountId} onChange={(v) => { setToAccountId(v); setManual((m) => ({ ...m, toFx: false, toAmount: false })); }} /></div>
-          </div>
-        )}
-        {crossCurrency && (
-          <div className="frow"><span className="lbl">對方收到</span><div className="ctrl"><MiniAmount label="對方收到" expr={ex.to_amount} active={active === 'to_amount'} onFocus={() => setActive('to_amount')} currency={toCurrency} /></div></div>
-        )}
-        {type === 'transfer' && (
-          <div className="frow"><span className="lbl">手續費</span><div className="ctrl"><MiniAmount label="手續費" expr={ex.fee} active={active === 'fee'} onFocus={() => setActive('fee')} currency={currency} placeholder="沒有就留空" /></div></div>
-        )}
-        {type !== 'transfer' && (
-          <div className="frow"><span className="lbl">分類</span><div className="ctrl"><CategoryButton kind={type} value={categoryId} onChange={setCategoryId} /></div></div>
-        )}
-        <div className="frow">
-          <label htmlFor="when">時間</label>
-          <div className="ctrl"><input id="when" type="datetime-local" value={when} onChange={(e) => e.target.value && setWhen(e.target.value)} /></div>
-        </div>
-        <div className="frow">
-          <label htmlFor="note">備註</label>
-          <div className="ctrl"><input id="note" value={note} maxLength={500} placeholder="選填" onChange={(e) => setNote(e.target.value)} onFocus={() => setActive(null)} /></div>
-        </div>
-        {currency !== 'TWD' && (
-          <div className="frow">
-            <label htmlFor="fx">{currency} 匯率</label>
-            <div className="ctrl"><input id="fx" inputMode="decimal" value={fxRate} placeholder="請手動填" onFocus={() => setActive(null)} onChange={(e) => { setFxRate(e.target.value); setManual((m) => ({ ...m, fx: true })); }} /></div>
-          </div>
-        )}
-        {type === 'transfer' && toCurrency !== 'TWD' && toCurrency !== currency && (
-          <div className="frow">
-            <label htmlFor="tofx">{toCurrency} 匯率</label>
-            <div className="ctrl"><input id="tofx" inputMode="decimal" value={toFxRate} placeholder="請手動填" onFocus={() => setActive(null)} onChange={(e) => { setToFxRate(e.target.value); setManual((m) => ({ ...m, toFx: true })); }} /></div>
-          </div>
-        )}
-        {type !== 'transfer' && (
-          <div className="frow"><span className="lbl">例外</span><span className="grow small muted">不規律的大額支出</span><Toggle label="例外" checked={isException} onChange={setIsException} /></div>
-        )}
-        {type === 'expense' && !original && !initial.pending_item_id && (
-          <div className="frow"><span className="lbl">分帳</span><span className="grow small muted">代墊，朋友之後還款</span><Toggle label="分帳" checked={split} onChange={(v) => { setSplit(v); if (v) setActive('mine'); }} /></div>
-        )}
+      <div className="etabs" role="tablist">
+        {[...(canTemplate ? [['templates', '範本']] : []), ['expense', '支出'], ['income', '收入'], ['transfer', '轉帳']].map(([v, l]) => (
+          <button key={v} type="button" role="tab" aria-selected={tab === v} onClick={() => { setTab(v); if (v !== 'templates') changeType(v); }}>{l}</button>
+        ))}
       </div>
 
-      {currency !== 'TWD' && autoRate && !manual.fx && autoRate.date !== date && (
-        <p className="small muted">無當日匯率，採用 {autoRate.date} 匯率。</p>
-      )}
-      {error && <div className="error" role="alert">{error}</div>}
+      {tab === 'templates' ? (
+        <div className="list">
+          {data.templates.length ? data.templates.map((t) => (
+            <button key={t.id} type="button" className="item" onClick={() => applyTemplate(t)}>
+              {t.type === 'transfer' ? <Tile name="swap" tone="plain" round size={38} /> : <Tile name={categoryIcon(data.tree, t.category_id)} tone={t.type === 'income' ? 'income' : ''} round size={38} />}
+              <div className="main"><div className="title">{t.name}</div><div className="sub">{t.type === 'transfer' ? `${accById.get(t.account_id)?.name ?? ''} → ${accById.get(t.to_account_id)?.name ?? ''}` : t.category_id ? data.tree.path(t.category_id) : ''}</div></div>
+              {t.amount != null && t.amount !== '' && <span className="num">{fmt(t.amount)}</span>}
+            </button>
+          )) : <div className="empty">還沒有範本</div>}
+        </div>
+      ) : (
+        <>
+          {type !== 'transfer' ? (
+            <div className="ehero">
+              <button type="button" className="catcard" onClick={() => { setActive(null); setPickCat(true); }} aria-label={`分類：${leaf ? data.tree.path(leaf.id) : '未選'}`}>
+                <Tile name={categoryIcon(data.tree, categoryId)} tone={type === 'income' ? 'income' : ''} round size={52} />
+                {parentPath && <span className="cc-parent">{parentPath}</span>}
+                <b className="cc-leaf">{leaf ? leaf.name : '選擇分類'}</b>
+                <Icon name="chev" className="chev down" />
+              </button>
+              <button type="button" className={`hamt ${active === 'amount' ? 'active' : ''}`} onClick={() => setActive('amount')} aria-label="金額">
+                <span className="cur">{split ? `總額 · ${currency}` : currency}</span>
+                <span className="expr num">{hasOperator(ex.amount) ? ex.amount.replace(/-/g, '−') : ''}</span>
+                <span className={`val num ${type}`}>{fmt(amount ?? 0, currency, { exact: true })}</span>
+              </button>
+            </div>
+          ) : (
+            <div className="xfer">
+              <div className="xacc">
+                <Tile name={accountIcon(acc)} round size={48} />
+                <b>{acc?.name ?? '轉出帳戶'}</b>
+                <AccountSelect id="acc" className="overlay-select" value={accountId} onChange={(v) => { setAccountId(v); setManual((m) => ({ ...m, fx: false })); }} />
+              </div>
+              <button type="button" className="swapbtn" onClick={swapAccounts} disabled={!toAccountId} aria-label="交換轉出和轉入帳戶"><Icon name="swap" /></button>
+              <div className="xacc right">
+                <b>{toAcc?.name ?? '轉入帳戶'}</b>
+                {toAcc ? <Tile name={accountIcon(toAcc)} round size={48} /> : <Tile name="plus" tone="plain" round size={48} />}
+                <AccountSelect id="to" className="overlay-select" value={toAccountId} placeholder="選擇轉入帳戶" filter={(a) => a.id !== accountId} onChange={(v) => { setToAccountId(v); setManual((m) => ({ ...m, toFx: false, toAmount: false })); }} />
+              </div>
+              <button type="button" className={`xamt from ${active === 'amount' ? 'active' : ''}`} onClick={() => setActive('amount')} aria-label="轉出金額">
+                <span className="lbl">轉出金額 <i>{currency}</i></span>
+                <span className="num">{hasOperator(ex.amount) ? ex.amount.replace(/-/g, '−') : fmt(amount ?? 0, currency, { exact: true })}</span>
+              </button>
+              <button type="button" className={`xamt to ${active === 'to_amount' ? 'active' : ''}`} onClick={() => crossCurrency && setActive('to_amount')} disabled={!crossCurrency} aria-label="轉入金額">
+                <span className="lbl">轉入金額 <i>{toCurrency}</i></span>
+                <span className="num">{fmt(toAmountShown ?? 0, toCurrency, { exact: true })}</span>
+              </button>
+            </div>
+          )}
 
-      {!active && (
-        <div className="grid2">
-          {original ? <button type="button" className="btn danger" onClick={remove} disabled={busy}><Icon name="trash" className="chev" />刪除</button>
-            : <button type="button" className="btn" onClick={() => setTplName(tplName == null ? '' : null)}>存成範本</button>}
-          <button type="button" className="btn primary" onClick={save} disabled={busy}>{busy ? '儲存中…' : '儲存'}</button>
-        </div>
+          {split && (
+            <div className="formlist">
+              <div className="frow"><span className="lbl">自己的部分</span><div className="ctrl"><MiniAmount label="自己的部分" expr={ex.mine} active={active === 'mine'} onFocus={() => setActive('mine')} currency={currency} placeholder="沒吃就填 0" /></div></div>
+              <div className="frow small muted" style={{ minHeight: 40 }}>
+                支出 {fmt(evaluate(ex.mine) ?? 0, currency)}，{fmt(Math.max(0, (amount ?? 0) - (evaluate(ex.mine) ?? 0)), currency)} 記到「朋友欠我」
+              </div>
+            </div>
+          )}
+
+          <div className="datebar">
+            <button type="button" aria-label="前一天" onClick={() => shiftDay(-1)}><Icon name="back" /></button>
+            <label className="db-mid">
+              <span className="num">{y}/{mo}/{d}</span><span className="small muted num">{when.slice(11, 16)}</span>
+              <input id="when" type="datetime-local" aria-label="時間" value={when} onChange={(e) => e.target.value && setWhen(e.target.value)} />
+            </label>
+            <button type="button" aria-label="後一天" onClick={() => shiftDay(1)}><Icon name="chev" /></button>
+          </div>
+
+          {type !== 'transfer' ? (
+            <div className="efield">
+              <span className="elabel">帳戶</span>
+              <div className="ebox">
+                <span className="grow">{acc?.name ?? '選擇帳戶'}{acc && acc.currency !== 'TWD' ? `（${acc.currency}）` : ''}</span>
+                {acc && acc.type !== 'brokerage' && <span className="small">餘額 <b className={`num ${data.balances.get(acc.id) < 0 ? 'expense' : ''}`}>{balanceOf(acc)}</b></span>}
+                <AccountSelect id="acc" className="overlay-select" value={accountId} onChange={(v) => { setAccountId(v); setManual((m) => ({ ...m, fx: false })); }} />
+              </div>
+            </div>
+          ) : (
+            <div className="efield">
+              <span className="elabel">手續費</span>
+              <MiniAmount label="手續費" expr={ex.fee} active={active === 'fee'} onFocus={() => setActive('fee')} currency={currency} placeholder="請輸入金額" />
+            </div>
+          )}
+
+          <textarea className="input enote" rows={3} maxLength={500} placeholder="請輸入備註" aria-label="備註" value={note} onChange={(e) => setNote(e.target.value)} onFocus={() => setActive(null)} />
+
+          {type !== 'transfer' && (
+            <div className="erow"><span className="grow">例外<span className="small muted">　不規律的大額支出</span></span><Toggle label="例外" checked={isException} onChange={setIsException} /></div>
+          )}
+
+          <button type="button" className="adv-toggle" aria-expanded={showAdvanced} onClick={() => setAdvanced(!showAdvanced)}>
+            <span>進階設定</span><Icon name="chev" className={`chev ${showAdvanced ? 'up' : 'down'}`} />
+          </button>
+          {showAdvanced && (
+            <div className="formlist">
+              {type === 'expense' && !original && !initial.pending_item_id && (
+                <div className="frow"><span className="lbl">分帳</span><span className="grow small muted">代墊，朋友之後還款</span><Toggle label="分帳" checked={split} onChange={(v) => { setSplit(v); if (v) setActive('mine'); }} /></div>
+              )}
+              {currency !== 'TWD' && (
+                <div className="frow">
+                  <label htmlFor="fx">{currency} 匯率</label>
+                  <div className="ctrl"><input id="fx" inputMode="decimal" value={fxRate} placeholder="請輸入" onFocus={() => setActive(null)} onChange={(e) => { setFxRate(e.target.value); setManual((m) => ({ ...m, fx: true })); }} /></div>
+                </div>
+              )}
+              {type === 'transfer' && toCurrency !== 'TWD' && toCurrency !== currency && (
+                <div className="frow">
+                  <label htmlFor="tofx">{toCurrency} 匯率</label>
+                  <div className="ctrl"><input id="tofx" inputMode="decimal" value={toFxRate} placeholder="請輸入" onFocus={() => setActive(null)} onChange={(e) => { setToFxRate(e.target.value); setManual((m) => ({ ...m, toFx: true })); }} /></div>
+                </div>
+              )}
+              {canTemplate && (
+                <div className="frow">
+                  <span className="lbl">存成範本</span>
+                  <div className="ctrl" style={{ gap: 8 }}>
+                    <input placeholder="範本名稱" value={tplName ?? ''} onFocus={() => setActive(null)} onChange={(e) => setTplName(e.target.value)} />
+                    <button type="button" className="btn" style={{ minHeight: 36 }} onClick={saveAsTemplate} disabled={busy}>存</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {currency !== 'TWD' && autoRate && !manual.fx && autoRate.date !== date && (
+            <p className="small muted">無當日匯率，採用 {autoRate.date} 匯率。</p>
+          )}
+          {error && <div className="error" role="alert">{error}</div>}
+
+          {!active && (
+            <div className={original ? 'grid2' : ''}>
+              {original && <button type="button" className="btn danger" onClick={remove} disabled={busy}><Icon name="trash" className="chev" />刪除</button>}
+              <button type="button" className="btn primary block" onClick={save} disabled={busy}>{busy ? '儲存中…' : '儲存'}</button>
+            </div>
+          )}
+          {active && <Keypad onKey={onKey} onDone={finishKeypad} />}
+          {pickCat && <CategoryPicker kind={type} value={categoryId} onClose={() => setPickCat(false)} onPick={(id) => { setCategoryId(id); setPickCat(false); if (!(amount > 0)) setActive('amount'); }} />}
+        </>
       )}
-      {tplName != null && !active && (
-        <div className="row-flex">
-          <input className="input grow" placeholder="範本名稱，例如：早餐" value={tplName} onChange={(e) => setTplName(e.target.value)} />
-          <button type="button" className="btn primary" onClick={saveAsTemplate} disabled={busy}>存</button>
-        </div>
-      )}
-      {active && <Keypad onKey={onKey} onDone={finishKeypad} />}
     </Sheet>
   );
 }

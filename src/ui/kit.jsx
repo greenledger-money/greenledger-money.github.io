@@ -58,6 +58,7 @@ const PATHS = {
   swap: 'M7 4 3 8l4 4M3 8h14m0 12 4-4-4-4m4 4H7',
   swapV: 'M7 20V4M4 7l3-3 3 3m7-3v16m-3-3 3 3 3-3',
   arrowUp: 'M12 19V5m-6 6 6-6 6 6',
+  arrowLeft: 'M19 12H5m6-6-6 6 6 6',
   arrowDown: 'M12 5v14m-6-6 6 6 6-6',
   layers: 'm12 3 9 5-9 5-9-5zm-9 9 9 5 9-5M3 16l9 5 9-5',
   car: 'M4 16v-4l2-5h12l2 5v4zM4 16v3h3v-3m10 0v3h3v-3M4 12h16M7.5 14h.01M16.5 14h.01',

@@ -71,6 +71,7 @@ export function press(expr, key) {
   }
   // 數字：避免 '00' 開頭
   const last = s.split(/[+\-×÷]/).pop();
+  if (key === '00') return last === '' || last === '0' ? s : s + '00';
   if (last === '0' && key !== '.') return s.slice(0, -1) + key;
   if (s.length > 40) return s;
   return s + key;
