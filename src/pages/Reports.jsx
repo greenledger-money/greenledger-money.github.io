@@ -1,7 +1,7 @@
 // 報表：分類占比圓環 → 點分類進那個分類的頁面 → 點最底層看每一筆（像 CWMoney）
 import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
-import { Icon, Page, Section, Seg, Toggle, back, go } from '../ui/kit.jsx';
+import { Icon, Page, Section, Seg, back, go } from '../ui/kit.jsx';
 import { TxnList } from '../ui/TxnList.jsx';
 import { Donut, LineChart, MonthBars } from '../ui/charts.jsx';
 import { categoryBreakdown, counts, monthlyTrend, netWorthSeries, summarize, twdOf } from '../lib/ledger.js';
@@ -21,7 +21,13 @@ function useReportState() {
   return { rs: RS, set, range, label };
 }
 
-function PeriodBar({ rs, set, label, showIncl = true }) {
+const EXC = [{ value: 'no', label: '不含例外' }, { value: 'yes', label: '含例外' }, { value: 'only', label: '只看例外' }];
+const excOf = (incl) => (incl === 'only' ? 'only' : incl ? 'yes' : 'no');
+function ExceptionBar({ rs, set }) {
+  return <Seg value={excOf(rs.incl)} onChange={(v) => set({ incl: v === 'only' ? 'only' : v === 'yes' })} options={EXC} />;
+}
+
+function PeriodBar({ rs, set, label }) {
   const shift = (n) => (rs.period === 'month' ? set({ month: shiftMonth(rs.month, n) }) : set({ year: rs.year + n }));
   return (
     <div className="row-flex" style={{ justifyContent: 'space-between' }}>
@@ -30,7 +36,6 @@ function PeriodBar({ rs, set, label, showIncl = true }) {
         <b>{label}</b>
         <button className="iconbtn" aria-label="往後" onClick={() => shift(1)}><Icon name="chev" /></button>
       </div>
-      {showIncl && <label className="row-flex small"><span>含例外</span><Toggle label="含例外" checked={rs.incl} onChange={(v) => set({ incl: v })} /></label>}
     </div>
   );
 }
@@ -57,8 +62,10 @@ export default function Reports() {
     <Page title="報表">
       <Seg value={rs.period} onChange={(v) => set({ period: v })} options={[{ value: 'month', label: '月' }, { value: 'year', label: '年' }]} />
       <PeriodBar rs={rs} set={set} label={label} />
+      <ExceptionBar rs={rs} set={set} />
 
       <div className="card">
+        {incl === 'only' && <div className="small muted" style={{ marginBottom: 6 }}>只算有勾「例外」的紀錄</div>}
         <div className="stats">
           <div><span className="small muted">收入</span><b className="num income">{fmt(s.income)}</b></div>
           <div><span className="small muted">支出</span><b className="num expense">{fmt(s.expense)}</b></div>
@@ -101,6 +108,7 @@ export function ReportCategory({ id }) {
   return (
     <Page title={data.tree.path(id)} onBack={() => back('reports')}>
       <PeriodBar rs={rs} set={set} label={label} />
+      <ExceptionBar rs={rs} set={set} />
       <div className="card" style={{ display: 'grid', gap: 12 }}>
         {rows.length
           ? <Donut rows={rows} onPick={(r) => openRow(r, id)} onSelect={(r) => openRow(r, id)} centerLabel={kind === 'expense' ? '總支出' : '總收入'} />
@@ -129,7 +137,8 @@ export function ReportTxns({ id }) {
   if (!node) return <Page title="明細" onBack={() => back('reports')}><div className="card">找不到這個分類</div></Page>;
   return (
     <Page title={`${node.name}${self ? '（未細分）' : ''}`} onBack={() => back('reports')}>
-      <PeriodBar rs={rs} set={set} label={label} showIncl={false} />
+      <PeriodBar rs={rs} set={set} label={label} />
+      <ExceptionBar rs={rs} set={set} />
       <div className="row-flex" style={{ justifyContent: 'space-between', padding: '0 4px' }}>
         <span className="muted">項目：<b className="num">{txns.length}</b> 筆</span>
         <span className="muted">合計：<b className={`num ${node.kind === 'expense' ? 'expense' : 'income'}`}>{fmt(total)}</b></span>

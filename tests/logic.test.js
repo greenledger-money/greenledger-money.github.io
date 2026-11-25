@@ -2,7 +2,7 @@
 import { describe, expect, test } from 'bun:test';
 import { evaluate, press } from '../src/lib/calc.js';
 import { occurrenceDate, dueOccurrences } from '../src/lib/recurring.js';
-import { buildSplit, computeBalances, summarize, categoryBreakdown, netWorth, netWorthSeries, buildFee, monthlyTrend } from '../src/lib/ledger.js';
+import { buildSplit, computeBalances, summarize, categoryBreakdown, netWorth, netWorthSeries, buildFee, monthlyTrend, counts } from '../src/lib/ledger.js';
 import { buildTree, validateCategory, parentOptions } from '../src/lib/categories.js';
 import { makeFx } from '../src/lib/fx.js';
 import { runFifo, makePriceBook, valuePositions, realizedByPeriod, allocation, estimateTwFee, estimateTwTax, stockValueByAccount, realizedTxnPlan } from '../src/lib/stocks.js';
@@ -404,4 +404,13 @@ describe('CSV 與預設資料', () => {
     expect(fmt(10.5, 'TWD', { exact: true })).toBe('$10.50');
     expect(fmt(24097.16)).toBe('$24,097');
   });
+});
+
+test('只看例外：counts 的 only 模式', () => {
+  const acc = new Map([['a', { id: 'a', hidden: false }]]);
+  const normal = { type: 'expense', account_id: 'a', is_exception: false };
+  const exc = { type: 'expense', account_id: 'a', is_exception: true };
+  expect([counts(normal, acc, true), counts(exc, acc, true)]).toEqual([true, true]);
+  expect([counts(normal, acc, false), counts(exc, acc, false)]).toEqual([true, false]);
+  expect([counts(normal, acc, 'only'), counts(exc, acc, 'only')]).toEqual([false, true]);
 });
