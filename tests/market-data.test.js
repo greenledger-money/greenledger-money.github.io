@@ -73,3 +73,40 @@ test('盤中：Yahoo 即時價，日期用當地時間', () => {
   expect(parseYahooQuote(j(262.7812345, 1764086400), 'US', 'qqqm')).toEqual({ market: 'US', symbol: 'QQQM', price_date: '2025-11-25', close: 262.7812, name: '' });
   expect(parseYahooQuote({ chart: { result: [{ meta: {} }] } }, 'TW', '2330')).toBeNull();
 });
+
+test('runUpdate：每日模式整套流程（假的網路），寫入台股、美股、匯率', async () => {
+  const { runUpdate } = await import('../scripts/update-market-data.mjs');
+  const posts = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    const u = String(url);
+    const json = (b) => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    if (u.includes('/rest/v1/stock_trades')) return json(u.includes('market=eq.TW') ? [{ symbol: '2330' }] : [{ symbol: 'voo' }]);
+    if (u.includes('/rest/v1/')) { posts.push([u.split('/rest/v1/')[1].split('?')[0], JSON.parse(init.body)]); return new Response(null, { status: 201 }); }
+    if (u.includes('twse')) return json([{ Code: '2330', Name: '台積電', ClosingPrice: '1,085.00', Date: '1151125' }]);
+    if (u.includes('tpex')) return json([]);
+    if (u.includes('stooq')) return new Response('Symbol,Date,Time,Close\nVOO.US,2026-11-24,22:00:00,600.5\n');
+    if (u.includes('rate.bot')) return new Response('<html>blocked</html>');
+    if (u.includes('er-api')) return json({ result: 'success', rates: { USD: 0.0305 } });
+    throw new Error(`沒預期的網址 ${u}`);
+  };
+  const lines = [];
+  const log = { log: (...a) => lines.push(a.join(' ')), warn: () => {}, error: (...a) => lines.push(a.join(' ')) };
+  try {
+    const r = await runUpdate({ base: 'https://x.supabase.co/', key: 'sb_secret_x', log });
+    expect(r.failures).toBe(0);
+  } finally { globalThis.fetch = realFetch; }
+  const prices = posts.filter(([t]) => t === 'stock_prices').flatMap(([, b]) => b);
+  expect(prices).toEqual([
+    { market: 'TW', symbol: '2330', price_date: '2026-11-25', close: 1085, name: '台積電' },
+    { market: 'US', symbol: 'VOO', price_date: '2026-11-24', close: 600.5, name: '' },
+  ]);
+  expect(posts.find(([t]) => t === 'fx_rates')[1][0]).toMatchObject({ currency: 'USD', rate: 32.786885 });
+});
+
+test('Supabase 函式裡的程式跟 scripts/ 的一樣（改了要一起更新、重新部署）', async () => {
+  const fs = await import('node:fs');
+  const a = fs.readFileSync(new URL('../scripts/update-market-data.mjs', import.meta.url), 'utf8');
+  const b = fs.readFileSync(new URL('../supabase/functions/market-data/update-market-data.mjs', import.meta.url), 'utf8');
+  expect(b).toBe(a);
+});

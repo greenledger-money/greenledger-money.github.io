@@ -47,7 +47,7 @@ export function parseTwPrices(rows, wanted, today) {
 
 /** 台銀 CSV → [{ currency, rate_date, rate }]（即期買入、賣出的中間價；沒有即期就用現金） */
 export function parseBotCsv(text, date) {
-  const lines = String(text).replace(/^﻿/, '').split(/\r?\n/).filter((l) => l.trim());
+  const lines = String(text).replace(/^\uFEFF/, '').split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return [];
   const head = lines[0].split(',').map((h) => h.trim());
   let spot = head.flatMap((h, i) => (h === '即期' ? [i] : []));
@@ -128,10 +128,15 @@ export function parseYahooQuote(json, market, symbol) {
   return { market, symbol: symbol.toUpperCase(), price_date, close: Math.round(price * 10000) / 10000, name: '' };
 }
 
-async function main() {
-  const base = process.env.SUPABASE_URL?.replace(/\/$/, '');
-  const key = process.env.SUPABASE_SECRET_KEY;
+/**
+ * 更新股價與匯率。GitHub Actions（node）和 Supabase Edge Function（Deno）共用這一份。
+ * intraday：只抓開盤中市場的盤中價；fxFrom：另外補抓這天以後的歷史匯率；log：輸出（預設 console）
+ * 回傳 { failures }：失敗的項目數
+ */
+export async function runUpdate({ base: rawBase, key, intraday = false, fxFrom = null, log = console }) {
+  const base = rawBase?.replace(/\/$/, '');
   if (!base || !key) throw new Error('缺少 SUPABASE_URL 或 SUPABASE_SECRET_KEY');
+  const console = log; // 下面沿用 console.log 的寫法
   const headers = { apikey: key, 'Content-Type': 'application/json' };
   if (key.startsWith('eyJ')) headers.Authorization = `Bearer ${key}`; // 舊版 service_role JWT
 
@@ -159,9 +164,9 @@ async function main() {
   const today = taipeiToday();
 
   // 盤中模式：只抓開盤中的市場、有人持有的代號；抓不到不算失敗（下一輪再試，收盤後的每日更新會補正式收盤價）
-  if (process.argv.includes('--intraday')) {
+  if (intraday) {
     const markets = openMarkets();
-    if (!markets.length) { console.log('現在沒有市場開盤，略過'); return; }
+    if (!markets.length) { console.log('現在沒有市場開盤，略過'); return { failures: 0 }; }
     for (const market of markets) {
       const held = await rest(`stock_trades?select=symbol&market=eq.${market}`);
       const wanted = [...new Set((held ?? []).map((r) => r.symbol.toUpperCase()))];
@@ -181,10 +186,9 @@ async function main() {
       // 只印檔數：repo 是公開的，執行紀錄任何人都看得到，不能印出持有哪些股票
       console.log(`${market} 盤中：${rows.length}/${wanted.length} 檔`);
     }
-    return;
+    return { failures: 0 };
   }
 
-  const fxFrom = process.argv.find((a) => a.startsWith('--fx-from='))?.split('=')[1];
   let failures = 0;
 
   // 1. 台股收盤價（只抓有人持有的代號）
@@ -258,9 +262,20 @@ async function main() {
     console.log(`補抓匯率：${n} 天`);
   }
 
+  return { failures };
+}
+
+// 直接用 node 執行時（GitHub Actions）
+async function main() {
+  const { failures } = await runUpdate({
+    base: process.env.SUPABASE_URL,
+    key: process.env.SUPABASE_SECRET_KEY,
+    intraday: process.argv.includes('--intraday'),
+    fxFrom: process.argv.find((a) => a.startsWith('--fx-from='))?.split('=')[1] ?? null,
+  });
   if (failures) process.exit(1); // 有任何一項失敗就讓 GitHub 顯示紅色
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (typeof process !== 'undefined' && process.argv?.[1] && import.meta.url === `file://${process.argv[1]}`) {
   main().catch((e) => { console.error(e.message); process.exit(1); });
 }
