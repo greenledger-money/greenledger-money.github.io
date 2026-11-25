@@ -109,7 +109,7 @@ export function useRoute() {
   useEffect(() => {
     let cur = location.hash;
     visited.push(cur);
-    const onScroll = () => { scrollPos.set(cur, window.scrollY); };
+    const onScroll = () => { if (!locks) scrollPos.set(cur, window.scrollY); };
     const on = () => {
       const next = location.hash;
       const isBack = visited.length >= 2 && visited[visited.length - 2] === next;
@@ -128,12 +128,33 @@ export function useRoute() {
   return route;
 }
 
-// 開視窗時鎖住後面的頁面捲動；用計數，多層視窗一起開關也不會留下鎖
+// 開視窗時鎖住後面的頁面；用計數，多層視窗一起開關也不會留下鎖。
+// iPhone Safari 只設 overflow:hidden 鎖不住：打開下拉選單或鍵盤時它會偷偷捲動後面的頁面，
+// 收起後畫面沒動、但點擊位置整個偏掉（按「取消」會點到別的欄位）。所以改成把 body 固定住。
 let locks = 0;
-function lockScroll() { locks += 1; document.body.style.overflow = 'hidden'; }
-function unlockScroll() { locks = Math.max(0, locks - 1); if (!locks) document.body.style.overflow = ''; }
+let lockedY = 0;
+function applyLock() {
+  lockedY = window.scrollY;
+  const b = document.body.style;
+  Object.assign(b, { position: 'fixed', top: `-${lockedY}px`, left: '0', right: '0', width: '100%', overflow: 'hidden' });
+}
+function releaseLock() {
+  const b = document.body.style;
+  Object.assign(b, { position: '', top: '', left: '', right: '', width: '', overflow: '' });
+  window.scrollTo(0, lockedY);
+}
+function lockScroll() { if (locks++ === 0) applyLock(); }
+function unlockScroll() { if (locks > 0 && --locks === 0) releaseLock(); }
 function unlockIfNoSheet() {
-  setTimeout(() => { if (!document.querySelector('.sheet')) { locks = 0; document.body.style.overflow = ''; } }, 50);
+  setTimeout(() => { if (!document.querySelector('.sheet') && (locks || document.body.style.position === 'fixed')) { locks = 0; releaseLock(); } }, 50);
+}
+// 鍵盤、下拉選單收起後，把被 Safari 推走的頁面拉回原位，點的位置才會跟畫面對上
+function realign() { if (locks && window.scrollY !== 0) window.scrollTo(0, 0); }
+if (typeof window !== 'undefined') {
+  document.addEventListener('focusout', () => setTimeout(realign, 60));
+  document.addEventListener('change', () => setTimeout(realign, 60));
+  window.visualViewport?.addEventListener('resize', () => setTimeout(realign, 60));
+  window.addEventListener('scroll', () => { if (locks) realign(); }, { passive: true });
 }
 export const go = (name, arg) => { location.hash = arg ? `${name}/${encodeURIComponent(arg)}` : name; };
 export const back = (fallback = 'home') => { if (history.length > 1) history.back(); else go(fallback); };
