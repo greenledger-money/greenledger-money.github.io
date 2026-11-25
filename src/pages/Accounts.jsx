@@ -50,7 +50,7 @@ export function AccountSheet({ original, onClose }) {
           </Field>
         </div>
         {f.type === 'brokerage' && <div className="notice">淨資產以股票市值計算。</div>}
-        <div className="row-flex"><span className="grow">隱藏<div className="small muted">不顯示在帳戶列表，也不計入資產與報表</div></span><Toggle label="隱藏" checked={f.hidden} onChange={set('hidden')} /></div>
+        <div className="row-flex"><span className="grow">隱藏<div className="small muted">不顯示在帳戶列表和記帳選單、不計入淨資產；收支照樣算進報表</div></span><Toggle label="隱藏" checked={f.hidden} onChange={set('hidden')} /></div>
         {err && <div className="error">{err}</div>}
         {original && !sys && <button className="btn danger block" onClick={remove} disabled={busy}>刪除帳戶</button>}
         {sys && <p className="small muted">系統帳戶無法刪除。</p>}

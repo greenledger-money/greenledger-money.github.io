@@ -107,7 +107,7 @@ describe('分帳與餘額', () => {
     expect(rows[1].amount).toBe(20);
     expect(rows[1].to_amount).toBe(640);
   });
-  test('隱藏帳戶不算收支、例外可排除、轉帳不算', () => {
+  test('隱藏帳戶的收支照算、例外可排除、轉帳不算', () => {
     const accounts = [{ id: 'a', type: 'cash', currency: 'TWD', opening_balance: 0 }, { id: 'h', type: 'cash', currency: 'TWD', opening_balance: 0, hidden: true }];
     const accById = new Map(accounts.map((a) => [a.id, a]));
     const txns = [
@@ -118,9 +118,9 @@ describe('分帳與餘額', () => {
       { type: 'transfer', occurred_at: at('2026-11-06'), account_id: 'a', amount: 50, fx_rate: 1, to_account_id: 'h', to_amount: 50, to_fx_rate: 1 },
     ];
     const { from, to } = monthRange('2026-11');
-    expect(summarize(txns, accById, { from, to })).toEqual({ income: 320, expense: 1100, net: -780 });
-    expect(summarize(txns, accById, { from, to, includeExceptions: false }).expense).toBe(100);
-    expect(monthlyTrend(txns, accById, ['2026-10', '2026-11'])[1]).toEqual({ month: '2026-11', income: 320, expense: 1100, net: -780 });
+    expect(summarize(txns, accById, { from, to })).toEqual({ income: 320, expense: 6100, net: -5780 });
+    expect(summarize(txns, accById, { from, to, includeExceptions: false }).expense).toBe(5100);
+    expect(monthlyTrend(txns, accById, ['2026-10', '2026-11'])[1]).toEqual({ month: '2026-11', income: 320, expense: 6100, net: -5780 });
   });
   test('未來日期的交易（還沒到交割日）不算進目前餘額', () => {
     const acc = [{ id: 'b', opening_balance: 1000 }];

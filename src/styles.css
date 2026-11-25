@@ -169,7 +169,7 @@ textarea.input { min-height: 72px; resize: vertical; }
 .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--surface-2); border-radius: 11px; padding: 3px; gap: 3px; }
 .seg button { border: 0; background: none; min-height: 36px; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
 .seg button[aria-pressed=true] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
-.toggle { position: relative; width: 51px; height: 31px; flex: none; }
+.toggle, .frow > label.toggle { position: relative; width: 51px; height: 31px; flex: none; }
 .toggle input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
 .toggle span { position: absolute; inset: 0; border-radius: 31px; background: var(--surface-2); border: 1px solid var(--line); transition: background .2s; pointer-events: none; }
 .toggle span::after { content: ""; position: absolute; top: 2px; left: 2px; width: 25px; height: 25px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s; }

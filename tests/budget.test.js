@@ -17,17 +17,17 @@ test('預算：一般、例外分開算，分類算到主分類', () => {
       tx({ amount: 100, category_id: 'lunch' }),
       tx({ amount: 50, category_id: 'food' }),
       tx({ amount: 300, category_id: 'fun', is_exception: true }),
-      tx({ amount: 999, category_id: 'fun', account_id: 'h' }),               // 隱藏帳戶不算
+      tx({ amount: 999, category_id: 'fun', account_id: 'h' }),               // 隱藏帳戶照算
       tx({ amount: 70, category_id: 'fun', occurred_at: '2026-12-01T04:00:00Z' }), // 不在這個月
       tx({ type: 'income', amount: 5000, category_id: null }),
       tx({ amount: 8000, category_id: 'loss' }),                               // 股票虧損不算
     ],
     accById, tree, from: new Date('2026-11-01T00:00:00+08:00'), to: new Date('2026-12-01T00:00:00+08:00'),
   });
-  expect(s.normal).toBe(150);
+  expect(s.normal).toBe(1149);
   expect(s.exception).toBe(300);
   expect(s.byRoot.get('food')).toBe(150);
-  expect(s.byRoot.get('fun')).toBeUndefined();
+  expect(s.byRoot.get('fun')).toBe(999);
 });
 
 test('預算：額度狀態與每天可花的天數', () => {

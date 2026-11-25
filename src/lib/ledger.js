@@ -48,12 +48,12 @@ export function computeBalances(accounts, txns, asOf = Date.now()) {
 /** 換成台幣 */
 export const twdOf = (t) => Number(t.amount) * Number(t.fx_rate || 1);
 
-/** 這筆要不要算進收支報表：轉帳不算、隱藏帳戶不算、可選擇排除「例外」 */
+/** 這筆要不要算進收支報表：轉帳不算、可選擇排除「例外」。隱藏帳戶的收支照算（隱藏只是不顯示在列表） */
 /** includeExceptions：true 含例外、false 不含、'only' 只看例外 */
 export function counts(t, accById, includeExceptions = true) {
   if (t.type === 'transfer') return false;
   const a = accById.get(t.account_id);
-  if (!a || a.hidden) return false;
+  if (!a) return false;
   if (!includeExceptions && t.is_exception) return false;
   if (includeExceptions === 'only' && !t.is_exception) return false;
   return true;
