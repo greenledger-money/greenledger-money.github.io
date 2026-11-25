@@ -141,7 +141,7 @@ export function netWorth({ accounts, balances, fx, stockValue }) {
 }
 
 /** 每月月底的淨資產（最多到今天） */
-export function netWorthSeries({ accounts, txns, monthKeys, fx, stockValueAt, now = new Date() }) {
+export function netWorthSeries({ accounts, txns, monthKeys, fx, stockValueAt, now = new Date(), includeStocks = true }) {
   const visible = accounts.filter((a) => !a.hidden);
   const bal = new Map(accounts.map((a) => [a.id, Number(a.opening_balance) || 0]));
   const sorted = [...txns].sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at));
@@ -154,10 +154,10 @@ export function netWorthSeries({ accounts, txns, monthKeys, fx, stockValueAt, no
       p++;
     }
     const endDay = ymd(new Date(end));
-    const stock = stockValueAt ? stockValueAt(endDay) : new Map();
+    const stock = stockValueAt && includeStocks ? stockValueAt(endDay) : new Map();
     let total = 0;
     for (const a of visible) {
-      if (a.type === 'brokerage') { total += stock.get(a.id)?.twd ?? 0; continue; }
+      if (a.type === 'brokerage') { if (includeStocks) total += stock.get(a.id)?.twd ?? 0; continue; }
       const rate = fx.rateOn(a.currency, endDay) ?? fx.latest(a.currency) ?? 0;
       total += bal.get(a.id) * rate;
     }

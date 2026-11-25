@@ -5,6 +5,7 @@ import { Empty, Field, Icon, Item, MoveButtons, Money, Page, Section, Seg, Sheet
 import { TxnList } from '../ui/TxnList.jsx';
 import { BrokerageView } from './Stocks.jsx';
 import { WorthCard } from './Home.jsx';
+import { GoalCard, useGoals } from './Goals.jsx';
 import { ACCOUNT_TYPES, accountTypeLabel, orderedTypes } from '../lib/ledger.js';
 import { CURRENCIES, fmt } from '../lib/money.js';
 
@@ -59,6 +60,16 @@ export function AccountSheet({ original, onClose }) {
   );
 }
 
+function GoalsStrip() {
+  const goals = useGoals().filter(({ p }) => !p.done);
+  if (!goals.length) return null;
+  return (
+    <Section title="存錢目標" action={<a className="link small" href="#goals">全部</a>}>
+      {goals.slice(0, 3).map(({ goal, p }) => <GoalCard key={goal.id} goal={goal} p={p} compact onClick={() => go('goals')} />)}
+    </Section>
+  );
+}
+
 export default function Accounts() {
   const { data, actions } = useLedger();
   const [run] = useAction();
@@ -99,6 +110,7 @@ export default function Accounts() {
       {!sorting && <button className="iconbtn" aria-label="新增帳戶" onClick={() => setEdit({})}><Icon name="plus" /></button>}
     </>}>
       <WorthCard big />
+      <GoalsStrip />
       {shownTypes.map((t) => {
         const list = visible.filter((a) => a.type === t.value);
         const sum = data.worth.rows.filter((r) => r.account.type === t.value).reduce((s, r) => s + r.twd, 0);

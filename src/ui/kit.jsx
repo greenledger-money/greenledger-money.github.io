@@ -336,17 +336,27 @@ export function UIProvider({ children, extra }) {
   const confirm = useCallback((message, { ok = '確定', danger = false, cancel = '取消' } = {}) => new Promise((resolve) => {
     setDialog({ message, ok, danger, cancel, resolve });
   }), []);
-  const close = (v) => { dialog?.resolve(v); setDialog(null); };
+  // 要使用者輸入一個值（取消回傳 null）
+  const prompt = useCallback((message, { ok = '確定', placeholder = '', inputMode = 'text', value = '' } = {}) => new Promise((resolve) => {
+    setDialog({ message, ok, cancel: '取消', input: { placeholder, inputMode, value }, resolve });
+  }), []);
+  const [text, setText] = useState('');
+  useEffect(() => { if (dialog?.input) setText(dialog.input.value ?? ''); }, [dialog]);
+  const close = (v) => { dialog?.resolve(dialog?.input ? (v ? text : null) : v); setDialog(null); };
   return (
-    <UICtx.Provider value={{ toast, confirm, ...extra }}>
+    <UICtx.Provider value={{ toast, confirm, prompt, ...extra }}>
       {children}
       {dialog && (
         <div className="dialog-backdrop" onClick={(e) => { if (e.target === e.currentTarget) close(false); }}>
           <div className="dialog" role="alertdialog" aria-modal="true">
             <p>{dialog.message}</p>
+            {dialog.input && (
+              <input className="input num" autoFocus inputMode={dialog.input.inputMode} placeholder={dialog.input.placeholder} aria-label={dialog.message}
+                value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') close(true); }} />
+            )}
             <div className="grid2">
               {dialog.cancel && <button className="btn" onClick={() => close(false)}>{dialog.cancel}</button>}
-              <button className={`btn ${dialog.danger ? 'danger' : 'primary'}`} onClick={() => close(true)} autoFocus>{dialog.ok}</button>
+              <button className={`btn ${dialog.danger ? 'danger' : 'primary'}`} onClick={() => close(true)} autoFocus={!dialog.input}>{dialog.ok}</button>
             </div>
           </div>
         </div>

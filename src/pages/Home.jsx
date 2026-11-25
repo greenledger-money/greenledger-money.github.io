@@ -131,9 +131,9 @@ export function WorthCard({ big = false }) {
           含股票
         </button>
       </div>
-      <button className="row-flex" style={{ border: 0, background: 'none', padding: 0, textAlign: 'left' }} onClick={() => go('accounts')}>
+      <button className="row-flex" style={{ border: 0, background: 'none', padding: 0, textAlign: 'left' }} onClick={() => go('worth')} aria-label="看淨資產走勢">
         <span className={`num grow ${big ? 'big' : ''}`} style={big ? undefined : { fontSize: 26, fontWeight: 700 }}>{fmt(total)}</span>
-        {!big && <Icon name="chev" className="chev" />}
+        <Icon name="chev" className="chev" />
       </button>
       {inc && data.worthStocks > 0 && <div className="small muted">其中股票市值 {fmt(data.worthStocks)}</div>}
       {data.worth.missingRate.length > 0 && <div className="small" style={{ color: 'var(--warn)' }}>缺少 {data.worth.missingRate.map((a) => a.currency).join('、')} 匯率，未計入</div>}

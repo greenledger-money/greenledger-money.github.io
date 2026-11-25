@@ -13,6 +13,8 @@ export function More() {
   const links = [
     ['transactions', 'doc', '明細', ''],
     ['friends', 'people', '朋友欠款', data.friendsOwe && data.balances.get(data.friendsOwe.id) > 0 ? `還欠 ${Math.round(data.balances.get(data.friendsOwe.id)).toLocaleString()}` : ''],
+    ['goals', 'star', '存錢目標', (data.settings.goals ?? []).length ? `${data.settings.goals.length} 個目標` : ''],
+    ['year', 'calendar', '年度回顧', ''],
     ['budget', 'wallet', '預算', data.settings.budget?.total ? `每月 ${Number(data.settings.budget.total).toLocaleString()}` : '未設定'],
     ['stocks', 'stock', '股票', `${data.holdings.length} 檔持股`],
     ['templates', 'bolt', '範本', `${data.templates.length} 個`],

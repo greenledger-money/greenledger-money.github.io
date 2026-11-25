@@ -400,3 +400,13 @@ details.card summary { cursor: pointer; color: var(--ink-2); }
 .friend-head .chev { color: var(--muted); }
 .card.friend > .btn { justify-self: end; }
 .card.friend .list { margin: 0 -4px; }
+
+/* 存錢目標 */
+button.card.goal { display: grid; gap: 8px; width: 100%; border: 0; text-align: left; color: inherit; font: inherit; }
+.bar.done > span { background: var(--income); }
+.goal-wrap { display: grid; gap: 6px; }
+.goal-wrap > .btn { justify-self: end; margin-top: -4px; }
+
+/* 年度回顧 */
+.review-tiles .card { display: grid; gap: 2px; align-content: start; }
+.review-tiles .card b { font-size: 19px; }

@@ -134,7 +134,8 @@ export default function Reports() {
           <Section title="近 12 個月">
             <div className="card"><MonthBars data={trend} onPick={(k) => { set({ period: 'month', month: k, view: 'cat' }); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /></div>
           </Section>
-          <Section title="淨資產走勢">
+          <button className="btn block" onClick={() => go('year')}><Icon name="calendar" className="chev" />{rs.year} 年度回顧</button>
+          <Section title="淨資產走勢" action={<button className="link small" onClick={() => go('worth')}>看更多</button>}>
             <div className="card">
               <LineChart data={worth} />
               <p className="small muted" style={{ margin: '8px 0 0' }}>每月月底，含股票市值</p>

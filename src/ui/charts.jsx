@@ -225,9 +225,14 @@ export function LineChart({ data, height = 190, label = '淨資產' }) {
               <text x={padL - 6} y={y(t) + 4} textAnchor="end" fontSize="11" fill="var(--muted)">{short(t)}</text>
             </g>
           ))}
-          {data.map((m, i) => ((!narrow || i % 2 === (data.length - 1) % 2) && (
-            <text key={m.month} x={x(i)} y={height - 6} textAnchor="middle" fontSize="11" fill="var(--muted)">{Number(m.month.slice(5))}月</text>
-          )))}
+          {data.map((m, i) => {
+            // 一年內：每月（窄螢幕隔月）；超過一年：只標每年一月和最後一個月
+            const long = data.length > 13;
+            const show = long ? (m.month.endsWith('-01') || i === data.length - 1) && !(i === data.length - 1 && data.length - 1 - data.findLastIndex((z) => z.month.endsWith('-01')) < 3 && !m.month.endsWith('-01'))
+              : (!narrow || i % 2 === (data.length - 1) % 2);
+            const text = long ? (m.month.endsWith('-01') ? `${m.month.slice(2, 4)}年` : `${Number(m.month.slice(5))}月`) : `${Number(m.month.slice(5))}月`;
+            return show && <text key={m.month} x={x(i)} y={height - 6} textAnchor="middle" fontSize="11" fill="var(--muted)">{text}</text>;
+          })}
           <path d={path} fill="none" stroke="var(--s1)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
           {d && (
             <>
