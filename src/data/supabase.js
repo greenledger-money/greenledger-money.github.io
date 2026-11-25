@@ -103,6 +103,15 @@ export async function createSupabaseBackend({ url, key, createClient: injected }
       return unwrap(await sb.from(table).update(patch).eq(keyCol, id).select().single());
     },
 
+    /** 多筆改成同樣的內容（一次 100 筆） */
+    async updateMany(table, ids, patch) {
+      const out = [];
+      for (let i = 0; i < ids.length; i += 100) {
+        out.push(...unwrap(await sb.from(table).update(patch).in('id', ids.slice(i, i + 100)).select()));
+      }
+      return out;
+    },
+
     async remove(table, ids) {
       // id 放在網址裡，一次 100 個以免網址太長
       for (let i = 0; i < ids.length; i += 100) {

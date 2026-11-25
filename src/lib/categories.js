@@ -47,6 +47,12 @@ export function buildTree(categories) {
  * 檢查新增／修改分類是否合法；合法回傳 null，否則回傳錯誤訊息。
  * draft: { id?, parent_id, kind, name }
  */
+/** 這個分類（或它的上層）有沒有設成「一律算例外」。回傳設定的那一層，沒有就 null */
+export function exceptionSource(tree, id, list = []) {
+  if (!id || !list?.length) return null;
+  return tree.chain(id).find((n) => list.includes(n.id)) ?? null;
+}
+
 export function validateCategory(tree, draft) {
   const name = (draft.name ?? '').trim();
   if (!name) return '請輸入分類名稱';

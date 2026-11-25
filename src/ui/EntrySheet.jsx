@@ -6,6 +6,7 @@ import { AccountSelect, CategoryPicker } from './pickers.jsx';
 import { evaluate, hasOperator, press } from '../lib/calc.js';
 import { fmt, round2 } from '../lib/money.js';
 import { addDays, fromInputDateTime, toInputDateTime } from '../lib/dates.js';
+import { exceptionSource } from '../lib/categories.js';
 
 // 鍵盤：5 欄，數字在左、運算在右（像 CWMoney）
 const PAD = [
@@ -76,10 +77,12 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
   const [active, setActive] = useState(original || !settings.keypadOnOpen ? null : 'amount');
   const [accountId, setAccountId] = useState(firstAccount);
   const [toAccountId, setToAccountId] = useState(src.to_account_id ?? null);
-  const [categoryId, setCategoryId] = useState(src.category_id ?? (src.type === 'transfer' ? null : lastCat(src.type ?? 'expense')));
+  const initCat = src.category_id ?? (src.type === 'transfer' ? null : lastCat(src.type ?? 'expense'));
+  const [categoryId, setCategoryId] = useState(initCat);
+  const alwaysExc = (id) => !!exceptionSource(data.tree, id, data.settings.exceptionCats);
   const [when, setWhen] = useState(toInputDateTime(src.occurred_at ?? new Date().toISOString()));
   const [note, setNote] = useState(src.note ?? '');
-  const [isException, setIsException] = useState(!!src.is_exception);
+  const [isException, setIsException] = useState(!!src.is_exception || (!original && alwaysExc(initCat)));
   const [split, setSplit] = useState(false);
   const [fxRate, setFxRate] = useState(original ? String(Number(original.fx_rate)) : '');
   const [toFxRate, setToFxRate] = useState(original?.to_fx_rate ? String(Number(original.to_fx_rate)) : '');
@@ -378,7 +381,7 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
             </div>
           )}
           {active && <Keypad onKey={onKey} onDone={finishKeypad} />}
-          {pickCat && <CategoryPicker kind={type} value={categoryId} onClose={() => setPickCat(false)} onPick={(id) => { setCategoryId(id); setPickCat(false); if (!(amount > 0)) setActive('amount'); }} />}
+          {pickCat && <CategoryPicker kind={type} value={categoryId} onClose={() => setPickCat(false)} onPick={(id) => { setCategoryId(id); if (alwaysExc(id)) setIsException(true); setPickCat(false); if (!(amount > 0)) setActive('amount'); }} />}
         </>
       )}
     </Sheet>

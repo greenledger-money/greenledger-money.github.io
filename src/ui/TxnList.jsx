@@ -3,7 +3,7 @@ import { useLedger } from '../store.jsx';
 import { Tile, categoryIcon, useUI } from './kit.jsx';
 import { fmt } from '../lib/money.js';
 import { dayLabel, localDate, timeLabel } from '../lib/dates.js';
-import { twdOf } from '../lib/ledger.js';
+import { counts, twdOf } from '../lib/ledger.js';
 
 /** 分類名稱：太長時只顯示最後兩層 */
 function catName(tree, id) {
@@ -65,7 +65,7 @@ export function TxnList({ txns, accountId, empty = '還沒有紀錄', dayTotals 
     <div className="list">
       {days.map((g) => {
         let exp = 0;
-        for (const t of g.items) if (t.type === 'expense' && !data.accById.get(t.account_id)?.hidden) exp += twdOf(t);
+        for (const t of g.items) if (t.type === 'expense' && counts(t, data.accById, true)) exp += twdOf(t);
         return (
           <div key={g.day} style={{ borderTop: 0 }}>
             <div className="daybar"><span>{dayLabel(g.day)}</span>{dayTotals && exp > 0 && <span className="num">支出 {fmt(exp)}</span>}</div>

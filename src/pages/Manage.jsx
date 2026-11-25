@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
 import { Empty, Field, Group, Icon, Item, MoveButtons, Money, Page, Section, Seg, Sheet, Toggle, back, go, useAction, useUI, Tile, categoryIcon, IconPicker } from '../ui/kit.jsx';
 import { AccountSelect, CategoryButton } from '../ui/pickers.jsx';
-import { parentOptions, validateCategory } from '../lib/categories.js';
+import { exceptionSource, parentOptions, validateCategory } from '../lib/categories.js';
 import { describe, nextDate, UNIT_LABEL } from '../lib/recurring.js';
 import { TXN_LABEL } from '../lib/ledger.js';
 import { dayLabel, todayStr } from '../lib/dates.js';
@@ -205,10 +205,20 @@ function CategorySheet({ original, kind, parentId, onClose }) {
   const opts = useMemo(() => parentOptions(data.tree, f.kind, original?.id), [data.tree, f.kind, original?.id]);
   const used = original && data.transactions.some((t) => t.category_id === original.id);
   const hasKids = original && data.tree.byId.get(original.id)?.children.length > 0;
+  const excList = data.settings.exceptionCats ?? [];
+  const excWas = !!original && excList.includes(original.id);
+  const [exc, setExc] = useState(excWas);
+  const [applyPast, setApplyPast] = useState(true);
+  const inherited = f.parent_id ? exceptionSource(data.tree, f.parent_id, excList) : null;
+  const pastCount = original && exc && !excWas ? actions.pastNotException(original.id).length : 0;
   async function save() {
     const e = validateCategory(data.tree, { ...f, id: original?.id });
     if (e) return setErr(e);
-    if (await run(() => actions.saveCategory(f, original), '已儲存')) onClose();
+    const ok = await run(async () => {
+      const saved = await actions.saveCategory(f, original);
+      if (exc !== excWas) await actions.setCategoryException(saved.id, exc, exc && applyPast);
+    }, '已儲存');
+    if (ok) onClose();
   }
   async function remove() {
     if (used) return setErr('這個分類已經有交易，不能刪除。可以打開「封存」，以後記帳就不會出現。');
@@ -231,6 +241,12 @@ function CategorySheet({ original, kind, parentId, onClose }) {
           <IconPicker value={f.icon ?? null} onChange={(v) => setF({ ...f, icon: v })} tone={f.kind === 'income' ? 'income' : ''}
             auto={categoryIcon({ ...data.tree, chain: () => [...(f.parent_id ? data.tree.chain(f.parent_id) : []), { name: f.name, icon: null }] }, 'x')} />
         </Field>
+        {inherited
+          ? <div className="row-flex"><span className="grow">一律算例外<div className="small muted">跟著上層「{inherited.name}」</div></span><Toggle label="一律算例外" checked disabled onChange={() => {}} /></div>
+          : <div className="row-flex"><span className="grow">一律算例外<div className="small muted">記到這個分類（含子分類）自動勾例外</div></span><Toggle label="一律算例外" checked={exc} onChange={setExc} /></div>}
+        {pastCount > 0 && (
+          <div className="row-flex"><span className="grow">過去 {pastCount} 筆也改成例外</span><Toggle label="過去的也改成例外" checked={applyPast} onChange={setApplyPast} /></div>
+        )}
         {original && <div className="row-flex"><span className="grow">封存<div className="small muted">記帳時不再顯示</div></span><Toggle label="封存" checked={f.archived} onChange={(v) => setF({ ...f, archived: v })} /></div>}
         {original?.system_key && <p className="small muted">系統分類無法刪除。</p>}
         {err && <div className="error">{err}</div>}
@@ -296,7 +312,7 @@ export function Categories() {
             {depth === 0 && <Tile name={categoryIcon(data.tree, n.id)} tone={kind === 'income' ? 'income' : ''} size={34} />}
             <button className="item" style={{ padding: '10px 0', flex: 1 }} onClick={() => setEdit({ original: n })}>
               <div className="main">
-                <div className="title" style={depth === 0 ? { fontWeight: 600 } : undefined}>{n.name}{n.archived && <span className="badge"> 已封存</span>}{n.system_key && <span className="badge"> 系統</span>}</div>
+                <div className="title" style={depth === 0 ? { fontWeight: 600 } : undefined}>{n.name}{n.archived && <span className="badge"> 已封存</span>}{n.system_key && <span className="badge"> 系統</span>}{(data.settings.exceptionCats ?? []).includes(n.id) && <span className="badge"> 例外</span>}</div>
                 {kids > 0 && !open.has(n.id) && <div className="sub">{kids} 個子分類</div>}
               </div>
               <span className="small muted num">{(kids && !open.has(n.id) ? total(n) : counts.get(n.id)) ? `${kids && !open.has(n.id) ? total(n) : counts.get(n.id)} 筆` : ''}</span>

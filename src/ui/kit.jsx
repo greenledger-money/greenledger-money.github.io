@@ -266,10 +266,10 @@ export function Seg({ options, value, onChange, label }) {
   );
 }
 
-export function Toggle({ checked, onChange, label }) {
+export function Toggle({ checked, onChange, label, disabled }) {
   return (
     <label className="toggle">
-      <input type="checkbox" role="switch" checked={!!checked} aria-label={label} onChange={(e) => onChange(e.target.checked)} />
+      <input type="checkbox" role="switch" checked={!!checked} aria-label={label} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
       <span />
     </label>
   );

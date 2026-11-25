@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS = {
   homeShowWorth: true,
   homeShowTemplates: true,
   homeShowBudget: true,      // 首頁顯示預算卡
+  exceptionCats: [],         // 設成「一律算例外」的分類 id（含底下的子分類）
   budget: { total: 0, exception: 0, categories: {} },  // 每月預算
   worthIncludeStocks: true,  // 淨資產要不要算股票市值
   accountTypeOrder: [],      // 帳戶類別（銀行、信用卡…）的順序

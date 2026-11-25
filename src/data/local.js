@@ -132,6 +132,12 @@ export function createLocalBackend() {
       return out;
     },
 
+    async updateMany(table, ids, patch) {
+      const out = [];
+      for (const id of ids) out.push(await this.update(table, id, patch));
+      return out;
+    },
+
     async update(table, id, patch) {
       const list = T(table);
       const key = table === 'profiles' ? 'user_id' : 'id';

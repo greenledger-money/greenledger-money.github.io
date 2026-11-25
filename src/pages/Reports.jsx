@@ -1,7 +1,8 @@
 // 報表：分類占比圓環 → 點分類進那個分類的頁面 → 點最底層看每一筆（像 CWMoney）
 import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
-import { Icon, Page, Section, Seg, back, categoryIcon, go } from '../ui/kit.jsx';
+import { Icon, Page, Section, Seg, back, categoryIcon, go, useAction, useUI } from '../ui/kit.jsx';
+import { exceptionSource } from '../lib/categories.js';
 import { TxnList } from '../ui/TxnList.jsx';
 import { Donut, LineChart, MonthBars } from '../ui/charts.jsx';
 import { categoryBreakdown, counts, monthlyTrend, netWorthSeries, summarize, twdOf } from '../lib/ledger.js';
@@ -25,6 +26,45 @@ const EXC = [{ value: 'no', label: '不含例外' }, { value: 'yes', label: '含
 const excOf = (incl) => (incl === 'only' ? 'only' : incl ? 'yes' : 'no');
 function ExceptionBar({ rs, set }) {
   return <Seg value={excOf(rs.incl)} onChange={(v) => set({ incl: v === 'only' ? 'only' : v === 'yes' })} options={EXC} />;
+}
+
+/** 這個分類在這段期間，被「不含例外／只看例外」擋掉的筆數和金額 */
+function useFilteredOut(catSet, kind, range, incl) {
+  const { data } = useLedger();
+  return useMemo(() => {
+    if (incl === true || !catSet) return null;
+    const lo = range.from.getTime(); const hi = range.to.getTime();
+    let n = 0; let sum = 0;
+    for (const t of data.transactions) {
+      if (t.type !== kind || !catSet.has(t.category_id)) continue;
+      const ms = Date.parse(t.occurred_at);
+      if (ms < lo || ms >= hi || !counts(t, data.accById, true) || counts(t, data.accById, incl)) continue;
+      n += 1; sum += twdOf(t);
+    }
+    return n ? { n, sum } : null;
+  }, [data, catSet, kind, range.from.getTime(), range.to.getTime(), incl]);
+}
+
+function FilteredOut({ info, incl, set, node }) {
+  const { data, actions } = useLedger();
+  const { confirm } = useUI();
+  const [run, busy] = useAction();
+  if (!info) return null;
+  // 同一個分類有的標例外、有的沒標：可以一鍵把整個分類設成「一律算例外」
+  const canFix = node && node.kind === 'expense' && !exceptionSource(data.tree, node.id, data.settings.exceptionCats);
+  async function fixAll() {
+    const n = actions.pastNotException(node.id).length;
+    if (!(await confirm(`把「${node.name}」設成一律算例外？\n過去 ${n} 筆沒勾例外的也會一起改，以後記到這個分類會自動勾例外。`, { ok: '設成例外' }))) return;
+    await run(() => actions.setCategoryException(node.id, true, true), '已設成例外');
+  }
+  return (
+    <div className="filtered-out">
+      <button className="grow" onClick={() => set({ incl: true })}>
+        另有 {info.n} 筆{incl === 'only' ? '非例外' : '例外'}（{fmt(info.sum)}）沒算進來 · <b>含例外一起看</b>
+      </button>
+      {canFix && <button className="btn small" disabled={busy} onClick={fixAll}>全部算例外</button>}
+    </div>
+  );
 }
 
 function PeriodBar({ rs, set, label }) {
@@ -114,12 +154,15 @@ export function ReportCategory({ id }) {
   const kind = node?.kind ?? rs.kind;
   const rows = useMemo(() => categoryBreakdown({ txns: data.transactions, tree: data.tree, accById: data.accById, kind, ...range, includeExceptions: rs.incl, parentId: id }),
     [data, kind, id, range.from.getTime(), range.to.getTime(), rs.incl]);
-  const total = rows.reduce((x, r) => x + r.amount, 0);
+  const total = rows.reduce((x, r) => x + r.total, 0);
+  const catSet = useMemo(() => data.tree.descendants(id), [data.tree, id]);
+  const out = useFilteredOut(catSet, kind, range, rs.incl);
   if (!node) return <Page title="報表" onBack={() => back('reports')}><div className="card">找不到這個分類</div></Page>;
   return (
     <Page title={data.tree.path(id)} onBack={() => back('reports')}>
       <PeriodBar rs={rs} set={set} label={label} />
       <ExceptionBar rs={rs} set={set} />
+      <FilteredOut info={out} incl={rs.incl} set={set} node={node} />
       <div className="card" style={{ display: 'grid', gap: 12 }}>
         {rows.length
           ? <Donut rows={rows} kind={kind} iconOf={(r) => categoryIcon(data.tree, r.id === '__self' ? id : r.id)} onPick={(r) => openRow(r, id)} onSelect={(r) => openRow(r, id)} centerLabel={kind === 'expense' ? '總支出' : '總收入'} />
@@ -137,9 +180,11 @@ export function ReportTxns({ id }) {
   const self = id.endsWith('~self');
   const catId = self ? id.slice(0, -5) : id;
   const node = data.tree.byId.get(catId);
+  const catSet = useMemo(() => (self ? new Set([catId]) : data.tree.descendants(catId)), [data.tree, catId, self]);
+  const out = useFilteredOut(node ? catSet : null, node?.kind, range, rs.incl);
   const txns = useMemo(() => {
     if (!node) return [];
-    const set2 = self ? new Set([catId]) : data.tree.descendants(catId);
+    const set2 = catSet;
     const lo = range.from.getTime(); const hi = range.to.getTime();
     return data.transactions.filter((t) => t.type === node.kind && set2.has(t.category_id) && counts(t, data.accById, rs.incl)
       && Date.parse(t.occurred_at) >= lo && Date.parse(t.occurred_at) < hi);
@@ -150,6 +195,7 @@ export function ReportTxns({ id }) {
     <Page title={`${node.name}${self ? '（未細分）' : ''}`} onBack={() => back('reports')}>
       <PeriodBar rs={rs} set={set} label={label} />
       <ExceptionBar rs={rs} set={set} />
+      <FilteredOut info={out} incl={rs.incl} set={set} node={node} />
       <div className="row-flex" style={{ justifyContent: 'space-between', padding: '0 4px' }}>
         <span className="muted">項目：<b className="num">{txns.length}</b> 筆</span>
         <span className="muted">合計：<b className={`num ${node.kind === 'expense' ? 'expense' : 'income'}`}>{fmt(total)}</b></span>

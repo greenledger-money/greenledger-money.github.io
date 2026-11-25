@@ -493,6 +493,26 @@ export function LedgerProvider({ backend, user, children }) {
       return (await insertRows('manual_prices', [{ market, symbol, price_date, close: Number(close) }], { onConflict: 'user_id,market,symbol,price_date' }))[0];
     }
 
+    /** 分類「一律算例外」：開關設定，applyPast 時把過去還沒標例外的也一起改 */
+    async function setCategoryException(catId, on, applyPast = false) {
+      const cur = d.settings.exceptionCats ?? [];
+      const next = on ? [...new Set([...cur, catId])] : cur.filter((x) => x !== catId);
+      await updateSettings({ exceptionCats: next });
+      if (!on || !applyPast) return 0;
+      const ids = pastNotException(catId).map((t) => t.id);
+      if (!ids.length) return 0;
+      guard();
+      const saved = await backend.updateMany('transactions', ids, { is_exception: true });
+      commit((t) => ({ ...t, transactions: mergeById(t.transactions, saved) }));
+      return saved.length;
+    }
+
+    /** 這個分類（含子分類）過去還沒標例外的支出 */
+    function pastNotException(catId) {
+      const set = d.tree.descendants(catId);
+      return T().transactions.filter((t) => t.type !== 'transfer' && set.has(t.category_id) && !t.is_exception);
+    }
+
     async function updateSettings(patch) {
       const p = T().profiles[0];
       return updateRow('profiles', p.user_id, { settings: { ...(p.settings ?? {}), ...patch } });
@@ -511,6 +531,7 @@ export function LedgerProvider({ backend, user, children }) {
     }
 
     return {
+      setCategoryException, pastNotException,
       saveTxn, deleteTxn, saveAccount, saveCategory, saveTemplate, useInstantTemplate, saveRecurring,
       confirmRecurring, skipPending, saveTrade, deleteTrade, saveDividend, deleteDividend, saveManualPrice,
       updateSettings, bulkInsert, insertRows, updateRow, removeRows, reorder, reload: load,
