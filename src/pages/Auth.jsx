@@ -61,13 +61,7 @@ export default function Auth({ supa, onDemo, hasDemoData }) {
     <div className="auth">
       <div className="brand">
         <h1>{APP.name}</h1>
-        <p>免費、多人可用的記帳本。分類可以三層、外幣自動帶匯率、分帳用「朋友欠我」記，餘額每次從帳本重算。</p>
-      </div>
-      <div className="ledger-art" aria-hidden="true">
-        <em style={{ top: 4 }}>早餐</em><b style={{ top: 4 }} className="expense">-$85</b>
-        <em style={{ top: 32 }}>朋友欠我 → 郵局</em><b style={{ top: 32 }}>$215</b>
-        <em style={{ top: 60 }}>薪水</em><b style={{ top: 60 }} className="income">+$52,000</b>
-        <em style={{ top: 88 }}>0050 股利</em><b style={{ top: 88 }} className="income">+$1,960</b>
+        <p>收支、帳戶、股票，一次看清楚。</p>
       </div>
 
       {supa ? (

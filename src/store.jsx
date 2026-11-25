@@ -40,7 +40,9 @@ export function LedgerProvider({ backend, user, children }) {
   const sharedRef = useRef(shared);
   sharedRef.current = shared;
   // 每次寫入都先算出新的資料，同步放進 tablesRef，下一個動作讀到的一定是最新的
-  const commit = (fn) => { const next = fn(tablesRef.current); tablesRef.current = next; setTables(next); };
+  // writes 記錄寫入次數：背景重新載入時如果中途有寫入，就再載一次，避免剛記的帳被舊資料蓋掉
+  const writes = useRef(0);
+  const commit = (fn) => { writes.current += 1; const next = fn(tablesRef.current); tablesRef.current = next; setTables(next); };
 
   // ---------- 低階寫入（同步畫面上的資料） ----------
   const guard = () => { if (status.offline) throw new Error('離線中，只能查看，不能修改'); };
@@ -135,9 +137,25 @@ export function LedgerProvider({ backend, user, children }) {
   }
 
   const load = useCallback(async () => {
-    setStatus((s) => ({ ...s, loading: true, error: null }));
+    // 先用上次存在這台裝置的資料把畫面打開，再到背景抓最新的換上去
+    let cached = null;
+    if (backend.kind === 'supabase' && !tablesRef.current) {
+      try { cached = JSON.parse(localStorage.getItem(snapKey(user.id)) || 'null'); } catch { /* ignore */ }
+    }
+    if (cached?.tables) {
+      tablesRef.current = cached.tables; setTables(cached.tables);
+      sharedRef.current = cached.shared; setShared(cached.shared);
+      setStatus({ loading: false, refreshing: true, error: null, offline: false });
+    } else {
+      setStatus((s) => ({ ...s, loading: true, error: null }));
+    }
     try {
-      let t = await backend.loadAll();
+      let t;
+      for (let i = 0; i < 3; i++) {
+        const before = writes.current;
+        t = await backend.loadAll();
+        if (writes.current === before) break;
+      }
       t = await bootstrap(t);
       setTables(t);
       tablesRef.current = t;
@@ -145,7 +163,7 @@ export function LedgerProvider({ backend, user, children }) {
       let sh = { fx_rates: [], stock_prices: [] };
       let warning = null;
       try { sh = await loadShared(t); } catch (e) { warning = `股價、匯率讀取失敗：${friendlyError(e)}`; console.error(e); }
-      setStatus({ loading: false, error: null, offline: false, warning });
+      setStatus({ loading: false, refreshing: false, error: null, offline: false, warning });
       if (backend.kind === 'supabase') {
         try { localStorage.setItem(snapKey(user.id), JSON.stringify({ tables: t, shared: sh, at: Date.now() })); } catch { /* 太大就不存 */ }
       }
@@ -156,7 +174,10 @@ export function LedgerProvider({ backend, user, children }) {
       try { snap = JSON.parse(localStorage.getItem(snapKey(user.id)) || 'null'); } catch { /* ignore */ }
       if (snap && isNetwork(e)) {
         setTables(snap.tables); setShared(snap.shared);
-        setStatus({ loading: false, error: null, offline: true, snapshotAt: snap.at });
+        setStatus({ loading: false, refreshing: false, error: null, offline: true, snapshotAt: snap.at });
+      } else if (cached?.tables) {
+        // 已經用快取打開了：不要整個畫面變錯誤頁，顯示提醒就好
+        setStatus({ loading: false, refreshing: false, error: null, offline: false, warning: `更新失敗：${friendlyError(e)}` });
       } else {
         setStatus({ loading: false, error: friendlyError(e), offline: false });
       }

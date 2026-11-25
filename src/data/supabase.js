@@ -13,24 +13,29 @@ const CHUNK = 500;
 
 const unwrap = ({ data, error }) => { if (error) throw error; return data; };
 
-export async function createSupabaseBackend({ url, key }) {
+export async function createSupabaseBackend({ url, key, createClient: injected }) {
   const sdk = SDK_URL;
-  const { createClient } = await import(/* @vite-ignore */ sdk);
+  const createClient = injected ?? (await import(/* @vite-ignore */ sdk)).createClient; // 測試時可以換成假的
   const sb = createClient(url, key, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, experimental: { passkey: true } },
   });
 
   const toUser = (u) => (u ? { id: u.id, email: u.email, demo: false } : null);
 
+  /** 讀整張表：第一頁順便拿總筆數，剩下的頁同時抓 */
   async function selectAll(table, build = (q) => q) {
-    const out = [];
-    for (let from = 0; ; from += PAGE) {
-      let q = build(sb.from(table).select('*'));
+    const page = (from, count) => {
+      let q = build(sb.from(table).select('*', count ? { count: 'exact' } : undefined));
       for (const col of ORDER[table] ?? ['id']) q = q.order(col);
-      const rows = unwrap(await q.range(from, from + PAGE - 1));
-      out.push(...rows);
-      if (rows.length < PAGE) break;
-    }
+      return q.range(from, from + PAGE - 1);
+    };
+    const first = await page(0, true);
+    if (first.error) throw first.error;
+    const out = [...first.data];
+    const total = first.count ?? out.length;
+    if (out.length < PAGE || total <= PAGE) return out;
+    const rest = await Promise.all(Array.from({ length: Math.ceil(total / PAGE) - 1 }, (_, i) => page((i + 1) * PAGE).then(unwrap)));
+    for (const rows of rest) out.push(...rows);
     return out;
   }
 
