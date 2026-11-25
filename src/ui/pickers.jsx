@@ -125,7 +125,6 @@ export function CategoryPicker({ kind, value, onPick, onClose }) {
         </div>
       </div>
       <AddCategory kind={kind} parentId={mainId} onAdded={onPick} />
-      <p className="small muted">改名、搬移、排序到「更多 › 分類」。</p>
     </Sheet>
   );
 }

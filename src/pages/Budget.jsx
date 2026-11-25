@@ -57,7 +57,7 @@ export function BudgetCard({ month }) {
   if (!mt && !me) {
     return (
       <button type="button" className="card row-flex" style={{ border: 0, textAlign: 'left', gap: 12 }} onClick={() => go('budget')}>
-        <Tile name="wallet" /><span className="grow"><b>設定預算</b><div className="small muted">一般支出每月、例外每年，看每天還能花多少</div></span>
+        <Tile name="wallet" /><span className="grow"><b>設定預算</b><div className="small muted">掌握每個月還能花多少</div></span>
         <Icon name="chev" className="chev" />
       </button>
     );
@@ -102,12 +102,11 @@ export default function Budget() {
 
       <Section title="預算額度">
         <div className="list">
-          <div className="item"><Tile name="wallet" /><div className="main"><div className="title">一般支出（每月）</div><div className="sub">沒勾「例外」的支出</div></div>
+          <div className="item"><Tile name="wallet" /><div className="main"><div className="title">一般支出（每月）</div><div className="sub">不含例外</div></div>
             <MoneyInput key={`t${b.total}`} label="一般支出每月預算" value={b.total} onCommit={(n) => n !== b.total && save({ total: n })} /></div>
-          <div className="item"><Tile name="calendar" /><div className="main"><div className="title">例外（每年）</div><div className="sub">有勾「例外」的支出，整年一起算</div></div>
+          <div className="item"><Tile name="calendar" /><div className="main"><div className="title">例外（每年）</div><div className="sub">全年合計</div></div>
             <MoneyInput key={`e${b.exceptionYear}`} label="例外每年預算" value={b.exceptionYear} onCommit={(n) => n !== b.exceptionYear && save({ exceptionYear: n })} /></div>
         </div>
-        <p className="small muted" style={{ margin: '6px 4px 0' }}>留空就是不設。例外像旅行、修手機這種不規律的，用一整年來看：某個月花很多沒關係，全年沒超過就好。股票虧損不算在預算裡。</p>
       </Section>
 
       {(mt || me) && (
@@ -134,7 +133,7 @@ export default function Budget() {
             );
           })}
         </div>
-        <p className="small muted" style={{ margin: '6px 4px 0' }}>分類預算只算一般支出（不含例外），包含底下所有子分類。</p>
+        <p className="small muted" style={{ margin: '6px 4px 0' }}>不含例外，包含子分類。</p>
       </Section>
     </Page>
   );

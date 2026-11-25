@@ -115,7 +115,7 @@ export function WorthCard({ big = false }) {
         {!big && <Icon name="chev" className="chev" />}
       </button>
       {inc && data.worthStocks > 0 && <div className="small muted">其中股票市值 {fmt(data.worthStocks)}</div>}
-      {data.worth.missingRate.length > 0 && <div className="small" style={{ color: 'var(--warn)' }}>{data.worth.missingRate.map((a) => a.currency).join('、')} 沒有匯率，暫時沒算進去</div>}
+      {data.worth.missingRate.length > 0 && <div className="small" style={{ color: 'var(--warn)' }}>缺少 {data.worth.missingRate.map((a) => a.currency).join('、')} 匯率，未計入</div>}
     </div>
   );
 }
@@ -196,7 +196,7 @@ export default function Home() {
       </span></>}>
         {dayTxns.length
           ? <div className="list">{dayTxns.map((t) => <TxnRow key={t.id} t={t} />)}</div>
-          : <div className="list"><Empty>{data.transactions.length ? '這天沒有紀錄' : <>還沒有紀錄。按上面的「記一筆」，或到「更多 › 從 CWMoney 匯入」。</>}</Empty></div>}
+          : <div className="list"><Empty>{data.transactions.length ? '這天沒有紀錄' : '還沒有紀錄'}</Empty></div>}
       </Section>
 
       <PendingList />

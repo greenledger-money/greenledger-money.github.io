@@ -160,8 +160,8 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
 
   async function remove() {
     const group = original.group_id ? data.transactions.filter((t) => t.group_id === original.group_id).length : 1;
-    const msg = group > 1 ? '這筆是分帳的一部分，會連同「轉進朋友欠我」那筆一起刪除。確定刪除？'
-      : feeChild ? '會連同拆出來的手續費一起刪除。確定刪除？' : '確定刪除這筆？';
+    const msg = group > 1 ? '會一併刪除分帳的「朋友欠我」紀錄。確定刪除？'
+      : feeChild ? '會一併刪除手續費紀錄。確定刪除？' : '確定刪除這筆？';
     if (!(await confirm(msg, { ok: '刪除', danger: true }))) return;
     if (await run(() => actions.deleteTxn(original), '已刪除')) onClose(true);
   }
@@ -179,7 +179,7 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
   if (locked) {
     return (
       <Sheet title="交易明細" onClose={() => onClose(false)}>
-        <div className="notice">這筆是{original.source === 'dividend' ? '股利' : original.type === 'transfer' ? '股票交割' : '股票賣出損益'}自動產生的，請到「股票」頁修改或刪除那筆{original.source === 'stock' ? '成交' : '股利'}。{original.source === 'stock' && original.type !== 'transfer' ? '損益會依先買先賣自動重算。' : ''}</div>
+        <div className="notice">此筆由{original.source === 'dividend' ? '股利' : original.type === 'transfer' ? '股票交割' : '股票賣出損益'}自動產生，請至「股票」修改。</div>
         <div className="formlist">
           <div className="frow"><span className="lbl">金額</span><div className="ctrl num">{fmt(original.amount, currency)}</div></div>
           <div className="frow"><span className="lbl">帳戶</span><div className="ctrl">{acc?.name}{toAcc ? ` → ${toAcc.name}` : ''}</div></div>
@@ -255,15 +255,15 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
           </div>
         )}
         {type !== 'transfer' && (
-          <div className="frow"><span className="lbl">例外</span><span className="grow small muted">月報可以切換不含例外</span><Toggle label="例外" checked={isException} onChange={setIsException} /></div>
+          <div className="frow"><span className="lbl">例外</span><span className="grow small muted">不規律的大額支出</span><Toggle label="例外" checked={isException} onChange={setIsException} /></div>
         )}
         {type === 'expense' && !original && !initial.pending_item_id && (
-          <div className="frow"><span className="lbl">分帳</span><span className="grow small muted">幫大家先付，朋友之後還</span><Toggle label="分帳" checked={split} onChange={(v) => { setSplit(v); if (v) setActive('mine'); }} /></div>
+          <div className="frow"><span className="lbl">分帳</span><span className="grow small muted">代墊，朋友之後還款</span><Toggle label="分帳" checked={split} onChange={(v) => { setSplit(v); if (v) setActive('mine'); }} /></div>
         )}
       </div>
 
       {currency !== 'TWD' && autoRate && !manual.fx && autoRate.date !== date && (
-        <p className="small muted">當天沒有 {currency} 匯率，用的是 {autoRate.date} 的匯率。</p>
+        <p className="small muted">無當日匯率，採用 {autoRate.date} 匯率。</p>
       )}
       {error && <div className="error" role="alert">{error}</div>}
 

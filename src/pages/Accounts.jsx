@@ -49,12 +49,11 @@ export function AccountSheet({ original, onClose }) {
             <input className="input num" inputMode="decimal" value={f.opening_balance} onChange={set('opening_balance')} />
           </Field>
         </div>
-        {f.type === 'brokerage' && <div className="notice">證券戶在淨資產裡用「股票市值」計算，不看帳上餘額。股票買賣的錢從交割戶（銀行）扣款。</div>}
-        {f.type === 'credit_card' && <div className="notice">刷卡當下記支出，繳卡費記成「銀行 → 信用卡」轉帳。</div>}
-        <div className="row-flex"><span className="grow">隱藏<div className="small muted">不出現在帳戶列表、不算總資產、不算收支報表</div></span><Toggle label="隱藏" checked={f.hidden} onChange={set('hidden')} /></div>
+        {f.type === 'brokerage' && <div className="notice">淨資產以股票市值計算。</div>}
+        <div className="row-flex"><span className="grow">隱藏<div className="small muted">不顯示在帳戶列表，也不計入資產與報表</div></span><Toggle label="隱藏" checked={f.hidden} onChange={set('hidden')} /></div>
         {err && <div className="error">{err}</div>}
         {original && !sys && <button className="btn danger block" onClick={remove} disabled={busy}>刪除帳戶</button>}
-        {sys && <p className="small muted">「朋友欠我」是系統帳戶，分帳會用到，不能刪除。</p>}
+        {sys && <p className="small muted">系統帳戶無法刪除。</p>}
       </div>
     </Sheet>
   );
@@ -99,7 +98,6 @@ export default function Accounts() {
       <button className="link" onClick={() => setSorting(!sorting)}>{sorting ? '完成' : '排序'}</button>
       {!sorting && <button className="iconbtn" aria-label="新增帳戶" onClick={() => setEdit({})}><Icon name="plus" /></button>}
     </>}>
-      {sorting && <div className="notice">標題旁的 ↑ ↓ 調整類別（銀行、信用卡…）的順序；帳戶旁的 ↑ ↓ 調整同一類裡的順序。記帳選帳戶時也照這個順序。</div>}
       <WorthCard big />
       {shownTypes.map((t) => {
         const list = visible.filter((a) => a.type === t.value);
@@ -114,7 +112,6 @@ export default function Accounts() {
       })}
       {hidden.length > 0 && (
         <Section title={<button className="btn small" onClick={() => setShowHidden(!showHidden)}>{showHidden ? '收起' : '顯示'}已隱藏的帳戶（{hidden.length}）</button>}>
-          {showHidden && <p className="small muted" style={{ margin: '0 4px 8px' }}>點帳戶 › 編輯 › 關掉「隱藏」就會回到列表。</p>}
           {(showHidden || sorting) && <div className="list">{hidden.map((a) => row(a, hidden.map((x) => x.id)))}</div>}
         </Section>
       )}
@@ -150,7 +147,7 @@ export function AccountDetail({ id }) {
           <div className="label">{accountTypeLabel(a.type)}{a.hidden ? '（已隱藏）' : ''} · 目前餘額</div>
           <div className={`big num ${bal < 0 ? 'expense' : ''}`}>{fmt(bal, a.currency, { exact: true })}</div>
           {a.currency !== 'TWD' && data.fx.latest(a.currency) && <div className="small muted">≈ {fmt(bal * data.fx.latest(a.currency))}（匯率 {data.fx.latest(a.currency)}）</div>}
-          <div className="small muted">期初 {fmt(a.opening_balance, a.currency)}，餘額每次都從帳本重新計算</div>
+          <div className="small muted">期初餘額 {fmt(a.opening_balance, a.currency)}</div>
         </div>
         <button className="btn primary" onClick={() => openEntry({ initial: { account_id: id, type: 'expense' } })}><Icon name="plus" className="chev" />在這個帳戶記一筆</button>
       </div>

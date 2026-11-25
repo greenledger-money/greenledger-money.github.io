@@ -94,12 +94,12 @@ export default function Auth({ supa, onDemo, hasDemoData }) {
             </button>
             {mode === 'login' && <button type="button" className="link" onClick={() => setMode('reset')}>忘記密碼</button>}
             {mode === 'reset' && <button type="button" className="link" onClick={() => setMode('login')}>回到登入</button>}
-            {mode === 'signup' && <p className="small muted" style={{ margin: 0 }}>註冊並登入後，可以在「設定」綁定 Passkey，之後用 Face ID 登入。</p>}
+            {mode === 'signup' && <p className="small muted" style={{ margin: 0 }}>登入後可在設定綁定 Passkey，使用 Face ID 登入。</p>}
           </form>
           <div className="divider">還不想註冊</div>
         </>
       ) : (
-        <div className="notice">這個網址還沒設定 Supabase，目前只能用試用模式（資料存在這台裝置）。</div>
+        <div className="notice">尚未連線伺服器，僅能使用試用模式。</div>
       )}
       <button className="btn block" onClick={onDemo}>{hasDemoData ? '繼續試用' : '先試用（附範例資料）'}</button>
       <button className="link" onClick={() => setPrivacy(true)}>隱私權政策</button>

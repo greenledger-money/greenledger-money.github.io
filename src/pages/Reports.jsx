@@ -65,7 +65,6 @@ export default function Reports() {
       <ExceptionBar rs={rs} set={set} />
 
       <div className="card">
-        {incl === 'only' && <div className="small muted" style={{ marginBottom: 6 }}>只算有勾「例外」的紀錄</div>}
         <div className="stats">
           <div><span className="small muted">收入</span><b className="num income">{fmt(s.income)}</b></div>
           <div><span className="small muted">支出</span><b className="num expense">{fmt(s.expense)}</b></div>
@@ -77,18 +76,17 @@ export default function Reports() {
         <div className="card" style={{ display: 'grid', gap: 12 }}>
           <Seg value={kind} onChange={(v) => set({ kind: v })} options={[{ value: 'expense', label: '支出' }, { value: 'income', label: '收入' }]} />
           <Donut rows={rows} onPick={(r) => openRow(r)} onSelect={(r) => openRow(r)} centerLabel={kind === 'expense' ? '總支出' : '總收入'} />
-          <p className="small muted" style={{ margin: 0 }}>點分類看下一層，最底層就是每一筆紀錄。隱藏帳戶的收支不算；外幣都換成台幣。</p>
         </div>
       </Section>
 
-      <Section title="每月收支（近 12 個月，點長條看那個月）">
+      <Section title="近 12 個月">
         <div className="card"><MonthBars data={trend} onPick={(k) => { set({ period: 'month', month: k }); window.scrollTo({ top: 0, behavior: 'smooth' }); }} /></div>
       </Section>
 
-      <Section title="淨資產走勢（每月月底）">
+      <Section title="淨資產走勢">
         <div className="card">
           <LineChart data={worth} />
-          <p className="small muted" style={{ margin: '8px 0 0' }}>含股票市值；股價、匯率用當月月底（或之前最近一天）的資料。</p>
+          <p className="small muted" style={{ margin: '8px 0 0' }}>每月月底，含股票市值</p>
         </div>
       </Section>
     </Page>

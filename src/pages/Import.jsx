@@ -164,7 +164,7 @@ export default function Import() {
       {step === 1 && (
         <>
           <div className="card prose">
-            <p style={{ marginTop: 0 }}>在 CWMoney 匯出 CSV（UTF-8），選擇檔案就會開始分析，還不會寫入任何資料。</p>
+            <p style={{ marginTop: 0 }}>選擇 CWMoney 匯出的 CSV（UTF-8），匯入前會先預覽。</p>
             <ul>
               <li>三行一組的轉帳會還原成一筆轉帳；手續費大於 0 另記一筆「其他支出-手續費」</li>
               <li>你填各帳戶在 CW 的<b>目前餘額</b>，程式反推期初餘額</li>
@@ -198,7 +198,7 @@ export default function Import() {
 
       {step === 2 && (
         <Section title={`步驟 1／3：帳戶（${plan.accounts.length} 個）`}>
-          <p className="small muted" style={{ margin: '0 4px 8px' }}>填 CW 裡每個帳戶「現在」的餘額。標成外幣的帳戶，舊紀錄（CW 當台幣記的）會用當天匯率換回外幣。</p>
+          <p className="small muted" style={{ margin: '0 4px 8px' }}>輸入各帳戶目前的餘額。外幣帳戶的舊紀錄會依當日匯率換算。</p>
           <div className="list">
             {plan.accounts.map((x) => {
               const a = acc[x.name];
@@ -241,7 +241,7 @@ export default function Import() {
       {step === 3 && (
         <>
           <Section title="步驟 2／3：代墊類分類">
-            <p className="small muted" style={{ margin: '0 4px 8px' }}>先幫朋友付、之後朋友還錢的分類，改記成「朋友欠我」轉帳，月支出和餘額才會正確。</p>
+            <p className="small muted" style={{ margin: '0 4px 8px' }}>代墊的款項會改記為「朋友欠我」轉帳。</p>
             <div className="list">
               {plan.categories.map((c) => (
                 <div key={c.key} className="item">
@@ -258,7 +258,7 @@ export default function Import() {
             </div>
           </Section>
           <Section title="步驟 3／3：主分類名稱">
-            <p className="small muted" style={{ margin: '0 4px 8px' }}>可以順便改名（例如「繳費（公」改成「繳費/訂閱」）。名稱跟現有分類一樣的會合併。</p>
+            <p className="small muted" style={{ margin: '0 4px 8px' }}>可修改名稱；與現有分類同名時會合併。</p>
             <div className="list">
               {mains.map((m) => (
                 <div key={m.key} className="item">

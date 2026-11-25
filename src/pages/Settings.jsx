@@ -58,7 +58,7 @@ export function Export() {
       </Section>
       <Section title="備份">
         <div className="card form">
-          <p className="small muted" style={{ margin: 0 }}>一鍵匯出全部交易（含隱藏帳戶）。Excel 可以直接打開。</p>
+          <p className="small muted" style={{ margin: 0 }}>匯出所有交易（含隱藏帳戶），可用 Excel 開啟。</p>
           <button className="btn" onClick={() => out(data.transactions, `記帳_全部_${todayStr()}.csv`)}><Icon name="download" className="chev" />匯出全部（{data.transactions.length} 筆）</button>
         </div>
       </Section>
@@ -110,7 +110,7 @@ function Passkeys() {
   const load = () => backend.passkey.list().then(setList).catch(() => setList([]));
   useEffect(() => { if (backend.passkey.supported) load(); }, []);
   if (!backend.passkey.supported) {
-    return <p className="small muted" style={{ margin: 0 }}>這個瀏覽器不支援 Passkey，或 Supabase 專案還沒打開 Passkey。</p>;
+    return <p className="small muted" style={{ margin: 0 }}>此裝置不支援 Passkey。</p>;
   }
   return (
     <>
@@ -176,8 +176,8 @@ export function Settings() {
         <div className="card form">
           <Switch label="顯示淨資產" checked={s.homeShowWorth} onChange={(v) => upd({ homeShowWorth: v })} />
           <Switch label="顯示範本按鈕" checked={s.homeShowTemplates} onChange={(v) => upd({ homeShowTemplates: v })} />
-          <Switch label="顯示預算" hint="預算到「更多 › 預算」設定" checked={s.homeShowBudget} onChange={(v) => upd({ homeShowBudget: v })} />
-          <Switch label="淨資產含股票市值" hint="首頁和帳戶頁的淨資產卡上也可以直接切換" checked={s.worthIncludeStocks} onChange={(v) => upd({ worthIncludeStocks: v })} />
+          <Switch label="顯示預算" checked={s.homeShowBudget} onChange={(v) => upd({ homeShowBudget: v })} />
+          <Switch label="淨資產含股票市值" checked={s.worthIncludeStocks} onChange={(v) => upd({ worthIncludeStocks: v })} />
         </div>
       </Section>
       <Section title="報表">
@@ -185,12 +185,12 @@ export function Settings() {
           <Group label="預設看">
             <Seg label="報表預設" value={s.reportPeriod} onChange={(v) => upd({ reportPeriod: v })} options={[{ value: 'month', label: '月' }, { value: 'year', label: '年' }]} />
           </Group>
-          <Switch label="預設含例外" hint="首頁本月支出也會照這個設定" checked={s.includeExceptions} onChange={(v) => upd({ includeExceptions: v })} />
+          <Switch label="預設含例外" hint="套用到首頁與報表" checked={s.includeExceptions} onChange={(v) => upd({ includeExceptions: v })} />
         </div>
       </Section>
       <Section title="股票">
         <div className="card form">
-          <Switch label="漲紅跌綠" hint="關掉改成漲綠跌紅" checked={s.twColors} onChange={(v) => upd({ twColors: v })} />
+          <Switch label="漲紅跌綠" hint="關閉為漲綠跌紅" checked={s.twColors} onChange={(v) => upd({ twColors: v })} />
           <Field label="台股預設交割戶"><AccountSelect value={s.settlementTW} onChange={(v) => upd({ settlementTW: v })} filter={(a) => a.type === 'bank'} allowEmpty placeholder="上次用的" /></Field>
           <Field label="美股預設交割戶"><AccountSelect value={s.settlementUS} onChange={(v) => upd({ settlementUS: v })} filter={(a) => a.type === 'bank'} allowEmpty placeholder="上次用的" /></Field>
           <div className="grid2">
@@ -205,7 +205,7 @@ export function Settings() {
             <NumSetting label="台股交割 T+" hint="工作天" value={s.twSettleDays} min={0} max={10} step={1} onSave={(v) => upd({ twSettleDays: v })} />
             <NumSetting label="美股交割 T+" hint="工作天" value={s.usSettleDays} min={0} max={10} step={1} onSave={(v) => upd({ usSettleDays: v })} />
           </div>
-          <p className="small muted" style={{ margin: 0 }}>這些只影響輸入成交時自動帶入的預設值，每筆都還可以手動改。</p>
+          <p className="small muted" style={{ margin: 0 }}>新增交易時的預設值。</p>
         </div>
       </Section>
       <Section title="其他">
@@ -216,7 +216,7 @@ export function Settings() {
       </Section>
       <Section title={user.demo ? '清空試用資料' : '刪除帳號'}>
         <div className="card form">
-          <p className="small" style={{ margin: 0 }}>{user.demo ? '刪除這台裝置上所有試用資料。' : '永久刪除帳號，連同所有帳戶、交易、股票紀錄一起刪除，不能復原。建議先到「匯出 CSV」備份。'}</p>
+          <p className="small" style={{ margin: 0 }}>{user.demo ? '刪除此裝置上的試用資料。' : '永久刪除帳號與所有資料，無法復原。'}</p>
           <input className="input" placeholder="輸入「刪除」確認" value={del} onChange={(e) => setDel(e.target.value)} />
           <button className="btn danger" disabled={busy} onClick={deleteAccount}>{user.demo ? '清空試用資料' : '永久刪除帳號'}</button>
         </div>

@@ -85,7 +85,7 @@ export function TradeSheet({ original, initial = {}, onClose }) {
   return (
     <Sheet title={original ? '修改成交' : initial.pending_item_id ? '確認券商成交' : '記錄成交'} onClose={onClose} onSave={save} saving={busy} full>
       <Seg value={f.side} onChange={set('side')} options={[{ value: 'buy', label: '買進' }, { value: 'sell', label: '賣出' }, { value: 'opening', label: '期初持股' }]} />
-      {f.side === 'opening' && <div className="notice">輸入目前股數＋均價，當成一批買進（不產生交割扣款）。從 CW 搬過來時用這個。</div>}
+      {f.side === 'opening' && <div className="notice">以目前股數與均價建立持股，不產生交割款。</div>}
       <div className="form">
         <Field label="證券戶">
           {brokerages.length ? (
@@ -118,15 +118,15 @@ export function TradeSheet({ original, initial = {}, onClose }) {
             </div>
             <Field label="交割戶"><AccountSelect value={f.settlement_account_id} onChange={set('settlement_account_id')} filter={(a) => a.type === 'bank'} placeholder="選擇交割戶" /></Field>
             {cross && (
-              <Field label={`實際${f.side === 'buy' ? '扣款' : '入帳'}（${settleAcc.currency}）`} hint="照對帳單填；留空用匯率換算">
+              <Field label={`實際${f.side === 'buy' ? '扣款' : '入帳'}（${settleAcc.currency}）`} hint="依對帳單，留空以匯率換算">
                 <input className="input num" inputMode="decimal" value={f.settle_amount} onChange={set('settle_amount')} />
               </Field>
             )}
             <div className="notice">
-              {f.side === 'buy' ? '交割日從交割戶扣款' : '交割日入帳到交割戶'} <b className="num">{fmt(net, currency)}</b>{cross ? `（${settleAcc.currency} 交割）` : ''}
-              （{f.side === 'buy' ? '價金＋手續費' : '價金－手續費－稅'}）。這是轉帳，不算進月收支。
+              {f.side === 'buy' ? '交割扣款' : '交割入帳'} <b className="num">{fmt(net, currency)}</b>{cross ? `（${settleAcc.currency} 交割）` : ''}
+              （{f.side === 'buy' ? '價金＋手續費' : '價金－手續費－稅'}）
             </div>
-            <Field label="委託書號" hint="選填，防止重複"><input className="input" value={f.order_no} onChange={set('order_no')} /></Field>
+            <Field label="委託書號" hint="選填"><input className="input" value={f.order_no} onChange={set('order_no')} /></Field>
           </>
         )}
         <Field label="備註"><input className="input" value={f.note} onChange={set('note')} /></Field>
@@ -195,7 +195,7 @@ export function DividendSheet({ original, initial = {}, onClose }) {
           <Field label="二代健保" hint={f.market === 'TW' && f.nhi_premium === '' ? '滿 2 萬扣 2.11%' : ''}><input className="input num" inputMode="decimal" value={f.nhi_premium} placeholder={String(nhi)} onChange={set('nhi_premium')} /></Field>
         </div>
         <Field label="入帳帳戶"><AccountSelect value={f.deposit_account_id} onChange={set('deposit_account_id')} filter={(a) => a.type !== 'brokerage'} /></Field>
-        <div className="notice">實拿 <b className="num">{fmt(gross - wh - nhi, divCur)}</b>，記成收入「投資收入-股利」（入帳帳戶是別的幣別時用匯率換算）。</div>
+        <div className="notice">實拿 <b className="num">{fmt(gross - wh - nhi, divCur)}</b>，記為「投資收入-股利」</div>
         <Field label="備註"><input className="input" value={f.note} onChange={set('note')} /></Field>
         {err && <div className="error">{err}</div>}
         {original && <button className="btn danger block" onClick={remove} disabled={busy}>刪除這筆股利</button>}
@@ -218,7 +218,7 @@ function PriceSheet({ market: m0 = 'TW', symbol: s0 = '', onClose }) {
   return (
     <Sheet title="手動輸入股價" onClose={onClose} onSave={save} saving={busy}>
       <div className="form">
-        <p className="small muted" style={{ margin: 0 }}>台股會每天收盤後自動更新；美股自動來源還沒決定，先手動輸入。同一天手動的價格優先。</p>
+        <p className="small muted" style={{ margin: 0 }}>股價每天自動更新；同一天以手動輸入為準。</p>
         <div className="grid2">
           <Field label="市場"><select className="input" value={f.market} onChange={set('market')}><option value="TW">台股</option><option value="US">美股</option></select></Field>
           <Field label="代號"><input className="input" value={f.symbol} onChange={set('symbol')} autoCapitalize="characters" /></Field>
@@ -287,7 +287,7 @@ export default function Stocks() {
           </div>
         </Section>
       )}
-      {!rows.length && <div className="list"><Empty>還沒有持股。先用「期初持股」輸入目前的股數和均價。</Empty></div>}
+      {!rows.length && <div className="list"><Empty>還沒有持股</Empty></div>}
 
       {alloc.length > 0 && (
         <Section title="資產配置">
@@ -323,7 +323,7 @@ export function StockDetail({ id }) {
   const [accountId, market, symbol] = id.split('|');
   const pos = data.positions.get(id);
   const row = data.holdings.find((r) => r.key === id);
-  if (!pos || pos.shares <= 1e-9) return <Page title={symbol} onBack={() => back('stocks')}><Empty>這檔已經全部賣掉了，獲益到「報表」查。</Empty></Page>;
+  if (!pos || pos.shares <= 1e-9) return <Page title={symbol} onBack={() => back('stocks')}><Empty>已全部賣出</Empty></Page>;
   const trades = [...pos.trades].sort((a, b) => b.trade_date.localeCompare(a.trade_date));
   const divs = data.dividends.filter((dv) => dv.symbol === symbol && dv.brokerage_account_id === accountId).sort((a, b) => b.pay_date.localeCompare(a.pay_date));
   const cur = currencyOfMarket(market);
@@ -399,7 +399,7 @@ export function BrokerageView({ account }) {
         <div className="big num">{fmt(mv, cur, { exact: true })}</div>
         <div className={`num ${pnlCls(pnl)}`} style={{ fontSize: 18, fontWeight: 600 }}>{fmt(pnl, cur, { sign: true, exact: true })}</div>
         <div className={`num small ${pnlCls(pnl)}`}>（{cost ? pct(pnl / cost) : '—'}）</div>
-        <div className="small muted">股票總市值{cur !== 'TWD' ? ` ≈ ${fmt(twd)}` : ''}{rows.some((r) => r.currency !== cur) ? `（外幣持股換成 ${cur}）` : ''}</div>
+        <div className="small muted">股票總市值{cur !== 'TWD' ? ` ≈ ${fmt(twd)}` : ''}{rows.some((r) => r.currency !== cur) ? `（已換算為 ${cur}）` : ''}</div>
         <div className="stats" style={{ borderTop: '1px solid var(--line)', marginTop: 12, paddingTop: 12 }}>
           <div><b className="num">{fmt(cost, cur)}</b><span className="small muted">股票成本</span></div>
           <div><b className="num">{rows.length}</b><span className="small muted">持股檔數</span></div>
@@ -429,7 +429,7 @@ export function BrokerageView({ account }) {
               </div>
               <Icon name="chev" className="chev" />
             </button>
-          )) : <Empty>還沒有持股。用「期初持股」輸入目前的股數和均價。</Empty>}
+          )) : <Empty>還沒有持股</Empty>}
         </div>
       </Section>
       {last && <p className="small muted right" style={{ margin: 0 }}>股價日期：{last}</p>}

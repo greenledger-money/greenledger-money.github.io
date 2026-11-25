@@ -11,21 +11,21 @@ import { dayLabel, todayStr } from '../lib/dates.js';
 export function More() {
   const { data, user } = useLedger();
   const links = [
-    ['transactions', 'doc', '明細', '按月份查詢、搜尋備註'],
-    ['budget', 'wallet', '預算', data.settings.budget?.total ? `每月 ${Number(data.settings.budget.total).toLocaleString()}` : '每月一般支出、例外各一個額度'],
+    ['transactions', 'doc', '明細', ''],
+    ['budget', 'wallet', '預算', data.settings.budget?.total ? `每月 ${Number(data.settings.budget.total).toLocaleString()}` : '未設定'],
     ['stocks', 'stock', '股票', `${data.holdings.length} 檔持股`],
     ['templates', 'bolt', '範本', `${data.templates.length} 個`],
     ['recurring', 'repeat', '固定收支', `${data.recurring_rules.filter((r) => r.active).length} 個進行中`],
-    ['categories', 'tag', '分類', '1–3 層，可以搬移、封存'],
-    ['import', 'upload', '從 CWMoney 匯入', '用 CW 匯出的 CSV'],
-    ['export', 'download', '匯出 CSV', '選範圍匯出，或一鍵備份全部'],
+    ['categories', 'tag', '分類', ''],
+    ['import', 'upload', '從 CWMoney 匯入', ''],
+    ['export', 'download', '匯出 CSV', ''],
     ['settings', 'gear', '設定', user.demo ? '試用模式' : user.email],
   ];
   return (
     <Page title="更多">
       <div className="list">
         {links.map(([href, icon, title, sub]) => (
-          <Item key={href} href={`#${href}`} left={<Tile name={icon} />} title={title} sub={sub} chevron />
+          <Item key={href} href={`#${href}`} left={<Tile name={icon} />} title={title} sub={sub || undefined} chevron />
         ))}
       </div>
     </Page>
@@ -91,7 +91,6 @@ export function Templates() {
       {list.length > 1 && <button className="link" onClick={() => setSorting(!sorting)}>{sorting ? '完成' : '排序'}</button>}
       {!sorting && <button className="iconbtn" aria-label="新增範本" onClick={() => setEdit({})}><Icon name="plus" /></button>}
     </>}>
-      <p className="small muted" style={{ margin: 0 }}>首頁會顯示範本按鈕。「帶入表單」會打開記帳表單讓你改；「一鍵直接記」按了就記好（要有固定金額）。</p>
       <div className="list">
         {list.length ? list.map((t) => {
           const acc = data.accById.get(t.account_id);
@@ -107,7 +106,7 @@ export function Templates() {
               sub={[TXN_LABEL[t.type], t.category_id && data.tree.path(t.category_id), acc?.name].filter(Boolean).join(' · ')}
               value={t.amount != null ? <Money value={t.amount} currency={acc?.currency} /> : <span className="muted small">不固定</span>} />
           );
-        }) : <Empty>還沒有範本。記帳時也可以按「存成範本」。</Empty>}
+        }) : <Empty>還沒有範本</Empty>}
       </div>
       {edit && <TemplateSheet original={edit.id ? edit : null} onClose={() => setEdit(null)} />}
     </Page>
@@ -144,7 +143,7 @@ function RecurringSheet({ original, onClose }) {
         <Field label="名稱"><input className="input" value={f.name} onChange={set('name')} placeholder="例如：房租、Netflix" /></Field>
         <Seg value={f.type} onChange={(t) => setF((x) => ({ ...x, type: t, category_id: data.tree.byId.get(x.category_id)?.kind === t ? x.category_id : null }))} options={['expense', 'income', 'transfer'].map((v) => ({ value: v, label: TXN_LABEL[v] }))} />
         <div className="formlist">
-          <div className="frow"><label htmlFor="ramt">金額</label><div className="ctrl"><input id="ramt" inputMode="decimal" value={f.amount} onChange={set('amount')} placeholder="確認時可以改" /></div></div>
+          <div className="frow"><label htmlFor="ramt">金額</label><div className="ctrl"><input id="ramt" inputMode="decimal" value={f.amount} onChange={set('amount')} placeholder="選填" /></div></div>
           <div className="frow"><span className="lbl">{f.type === 'transfer' ? '轉出' : '帳戶'}</span><div className="ctrl"><AccountSelect className="" value={f.account_id} onChange={set('account_id')} /></div></div>
           {f.type === 'transfer'
             ? <div className="frow"><span className="lbl">轉入</span><div className="ctrl"><AccountSelect className="" value={f.to_account_id} onChange={set('to_account_id')} placeholder="選擇轉入帳戶" /></div></div>
@@ -164,7 +163,7 @@ function RecurringSheet({ original, onClose }) {
           <Field label="起始日"><input className="input" type="date" value={f.start_date} onChange={set('start_date')} /></Field>
           <Field label="結束日" hint="選填"><input className="input" type="date" value={f.end_date} onChange={set('end_date')} /></Field>
         </div>
-        <p className="small muted" style={{ margin: 0 }}>日期用「起始日＋第幾次」計算，月底不會漂移：1/31 → 2/28 → 3/31。到期不會自動入帳，會放進首頁的「待確認」。</p>
+        <p className="small muted" style={{ margin: 0 }}>到期時會列在首頁「待確認」。</p>
         <div className="row-flex"><span className="grow">啟用</span><Toggle label="啟用" checked={f.active} onChange={set('active')} /></div>
         {err && <div className="error">{err}</div>}
         {original && <button className="btn danger block" onClick={remove} disabled={busy}>刪除</button>}
@@ -187,7 +186,7 @@ export function Recurring() {
               sub={`${describe(r)} · ${nd ? `下次 ${dayLabel(nd)}` : '已結束'} · ${acc?.name ?? ''}`}
               value={<Money value={r.amount} currency={acc?.currency} tone={r.type === 'expense' ? 'expense' : r.type === 'income' ? 'income' : ''} />} />
           );
-        }) : <Empty>還沒有固定收支。房租、薪水、訂閱都可以設定。</Empty>}
+        }) : <Empty>還沒有固定收支</Empty>}
       </div>
       {edit && <RecurringSheet original={edit.id ? edit : null} onClose={() => setEdit(null)} />}
     </Page>
@@ -228,12 +227,12 @@ function CategorySheet({ original, kind, parentId, onClose }) {
             {opts.map((o) => <option key={o.id} value={o.id}>{'　'.repeat(o.depth - 1)}{o.label}</option>)}
           </select>
         </Field>
-        <Field label="圖示" hint={f.icon ? '' : '「自動」會照名稱判斷；子分類沒選就跟上層一樣'}>
+        <Field label="圖示">
           <IconPicker value={f.icon ?? null} onChange={(v) => setF({ ...f, icon: v })} tone={f.kind === 'income' ? 'income' : ''}
             auto={categoryIcon({ ...data.tree, chain: () => [...(f.parent_id ? data.tree.chain(f.parent_id) : []), { name: f.name, icon: null }] }, 'x')} />
         </Field>
-        {original && <div className="row-flex"><span className="grow">封存<div className="small muted">舊帳保留，記帳時不再出現</div></span><Toggle label="封存" checked={f.archived} onChange={(v) => setF({ ...f, archived: v })} /></div>}
-        {original?.system_key && <p className="small muted">這是系統分類（程式會用到），可以改名、搬移，但不能刪除。</p>}
+        {original && <div className="row-flex"><span className="grow">封存<div className="small muted">記帳時不再顯示</div></span><Toggle label="封存" checked={f.archived} onChange={(v) => setF({ ...f, archived: v })} /></div>}
+        {original?.system_key && <p className="small muted">系統分類無法刪除。</p>}
         {err && <div className="error">{err}</div>}
         {original && !original.system_key && <button className="btn danger block" onClick={remove} disabled={busy}>刪除分類</button>}
       </div>
@@ -279,7 +278,7 @@ export function Categories() {
     </>}>
       <Seg value={kind} onChange={setKind} options={[{ value: 'expense', label: '支出' }, { value: 'income', label: '收入' }]} />
       <div className="row-flex">
-        <p className="small muted grow" style={{ margin: 0 }}>{sorting ? '用 ↑ ↓ 調整同一層分類的順序，記帳選分類時也會照這個順序。' : '點 › 展開子分類；點名稱可以改名、搬移、封存；按 ＋ 在它底下新增子分類（最多三層）。'}</p>
+        <span className="grow" />
         <button className="link small" style={{ flex: 'none' }} onClick={() => setOpen(allOpen ? new Set() : new Set(parents))}>{allOpen ? '全部收起' : '全部展開'}</button>
       </div>
       <div className="list">
