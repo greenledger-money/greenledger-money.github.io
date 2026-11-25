@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { daysLeft, meter, readBudget, spending } from '../src/lib/budget.js';
+import { daysLeft, meter, monthsLeft, readBudget, spending } from '../src/lib/budget.js';
 import { buildTree } from '../src/lib/categories.js';
 
 const tree = buildTree([
@@ -37,6 +37,11 @@ test('預算：額度狀態與每天可花的天數', () => {
   expect(meter(14000, 13500)).toMatchObject({ left: -500, level: 'over', over: true });
   expect(daysLeft('2026-11', '2026-11-25')).toBe(6);
   expect(daysLeft('2026-10', '2026-11-25')).toBeNull();
+  expect(monthsLeft(2026, '2026-11-25')).toBe(2);
+  expect(monthsLeft(2025, '2026-11-25')).toBeNull();
+  // 舊版每月例外 2000 → 一年 24000；新版直接存一年
   expect(readBudget({ budget: { total: '13500', exception: 2000, categories: { food: 6000, fun: 0 } } }))
-    .toEqual({ total: 13500, exception: 2000, categories: { food: 6000 } });
+    .toEqual({ total: 13500, exceptionYear: 24000, categories: { food: 6000 } });
+  expect(readBudget({ budget: { total: 13500, exceptionYear: 30000, exception: 2000 } }).exceptionYear).toBe(30000);
+  expect(readBudget({ budget: { total: 13500, exceptionYear: 0, exception: 2000 } }).exceptionYear).toBe(0);
 });

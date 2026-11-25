@@ -1,4 +1,4 @@
-// 預算：每月一般支出、例外支出各一個額度，主分類可以另外設（只算一般支出）；股票虧損不算
+// 預算：一般支出每月一個額度、例外一年一個額度，主分類可以另外設（只算一般支出）；股票虧損不算
 import { counts, twdOf } from './ledger.js';
 import { parseYmd } from './dates.js';
 
@@ -39,11 +39,18 @@ export function daysLeft(month, today) {
   return last - d.getDate() + 1;
 }
 
-/** 設定裡的預算整理成數字 */
+/** 今年還剩幾個月（含這個月）；不是今年就回傳 null */
+export function monthsLeft(year, today) {
+  if (Number(today.slice(0, 4)) !== Number(year)) return null;
+  return 12 - Number(today.slice(5, 7)) + 1;
+}
+
+/** 設定裡的預算整理成數字。例外是一年的額度（舊版存的是每月 exception，換算成 ×12） */
 export function readBudget(settings) {
   const b = settings?.budget ?? {};
   const num = (v) => (Number(v) > 0 ? Number(v) : 0);
   const categories = {};
   for (const [k, v] of Object.entries(b.categories ?? {})) if (num(v)) categories[k] = num(v);
-  return { total: num(b.total), exception: num(b.exception), categories };
+  const exceptionYear = b.exceptionYear != null ? num(b.exceptionYear) : num(b.exception) * 12;
+  return { total: num(b.total), exceptionYear, categories };
 }
