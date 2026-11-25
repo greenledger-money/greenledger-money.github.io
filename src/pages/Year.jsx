@@ -1,8 +1,9 @@
 // 年度回顧：一年的收支、儲蓄率、花最多的分類、跟去年比、淨資產變化
 import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
-import { Icon, Page, Section, Tile, back, categoryIcon, go, useAction, useUI } from '../ui/kit.jsx';
+import { Page, Section, Tile, back, categoryIcon, go, useAction, useUI } from '../ui/kit.jsx';
 import { MonthBars } from '../ui/charts.jsx';
+import { PeriodNav } from '../ui/PeriodPicker.jsx';
 import { yearReview } from '../lib/review.js';
 import { thisMonth, localDate } from '../lib/dates.js';
 import { fmt } from '../lib/money.js';
@@ -32,11 +33,7 @@ export default function Year() {
 
   return (
     <Page title="年度回顧" onBack={() => back('reports')}>
-      <div className="monthnav" style={{ justifyContent: 'center' }}>
-        <button className="iconbtn" aria-label="前一年" disabled={year <= firstYear} onClick={() => setYear(year - 1)}><Icon name="back" /></button>
-        <b>{year} 年{isNow ? '（到目前）' : ''}</b>
-        <button className="iconbtn" aria-label="後一年" disabled={isNow} onClick={() => setYear(year + 1)}><Icon name="chev" /></button>
-      </div>
+      <PeriodNav mode="year" value={year} onChange={setYear} label={`${year} 年${isNow ? '（到目前）' : ''}`} min={firstYear} center />
 
       {r.count === 0 ? <div className="card empty">這一年沒有紀錄</div> : (
         <>

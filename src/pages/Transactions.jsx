@@ -1,10 +1,11 @@
 // 明細：按月份（或自訂期間、全部）看交易；可依帳戶、分類、備註、類型、例外、金額篩選
 import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
-import { Icon, Page, Seg, back } from '../ui/kit.jsx';
+import { Page, Seg, back } from '../ui/kit.jsx';
 import { TxnList } from '../ui/TxnList.jsx';
+import { PeriodNav } from '../ui/PeriodPicker.jsx';
 import { AccountSelect, CategoryButton } from '../ui/pickers.jsx';
-import { monthLabel, monthRange, shiftMonth, thisMonth, todayStr, ymd } from '../lib/dates.js';
+import { monthLabel, monthRange, thisMonth, todayStr, ymd } from '../lib/dates.js';
 import { summarize, twdOf } from '../lib/ledger.js';
 import { fmt } from '../lib/money.js';
 
@@ -59,11 +60,7 @@ export default function Transactions() {
     <Page title="明細" onBack={() => back('home')}>
       <Seg value={period} onChange={setPeriod} options={[{ value: 'month', label: '按月' }, { value: 'custom', label: '自訂期間' }, { value: 'all', label: '全部' }]} />
       {period === 'month' && (
-        <div className="monthnav" style={{ justifyContent: 'center' }}>
-          <button className="iconbtn" aria-label="上個月" onClick={() => setMonth(shiftMonth(month, -1))}><Icon name="back" /></button>
-          <b>{monthLabel(month)}</b>
-          <button className="iconbtn" aria-label="下個月" onClick={() => setMonth(shiftMonth(month, 1))}><Icon name="chev" /></button>
-        </div>
+        <PeriodNav mode="month" value={month} onChange={setMonth} label={monthLabel(month)} center />
       )}
       {period === 'custom' && (
         <div className="grid2">

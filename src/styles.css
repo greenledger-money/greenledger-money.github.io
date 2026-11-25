@@ -413,3 +413,14 @@ button.card.goal { display: grid; gap: 8px; width: 100%; border: 0; text-align: 
 
 /* 明細進階篩選 */
 .adv-filter .row-flex .input { flex: 1; min-width: 0; text-align: right; }
+
+/* 點年月直接選 */
+.period-label { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; color: inherit; font: inherit; padding: 6px 8px; border-radius: 10px; }
+.period-label:active { background: var(--surface-2); }
+.period-label .caret { width: 14px; height: 14px; color: var(--muted); transform: rotate(90deg); }
+.period-pick { display: grid; gap: 10px; }
+.pgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.pgrid button { min-height: 52px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-weight: 600; }
+.pgrid button.now { border-color: var(--income); }
+.pgrid button[aria-pressed="true"] { background: var(--income); border-color: var(--income); color: #fff; }
+.pgrid button:disabled { opacity: .35; }

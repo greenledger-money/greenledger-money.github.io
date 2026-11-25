@@ -3,11 +3,12 @@ import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
 import { Icon, Page, Section, Seg, back, categoryIcon, go, useAction, useUI } from '../ui/kit.jsx';
 import { exceptionSource } from '../lib/categories.js';
+import { PeriodNav } from '../ui/PeriodPicker.jsx';
 import { TxnList } from '../ui/TxnList.jsx';
 import { Donut, LineChart, MonthBars } from '../ui/charts.jsx';
 import { categoryBreakdown, counts, monthlyTrend, summarize, twdOf } from '../lib/ledger.js';
 import { fmt } from '../lib/money.js';
-import { lastMonths, monthLabel, monthRange, shiftMonth, thisMonth } from '../lib/dates.js';
+import { lastMonths, monthLabel, monthRange, thisMonth } from '../lib/dates.js';
 
 // 報表的期間、收支、含例外：在報表和點進去的頁面之間共用（換頁不會跑掉）
 const RS = { view: 'cat', period: null, month: thisMonth(), year: Number(thisMonth().slice(0, 4)), kind: 'expense', incl: null };
@@ -68,16 +69,9 @@ function FilteredOut({ info, incl, set, node }) {
 }
 
 function PeriodBar({ rs, set, label }) {
-  const shift = (n) => (rs.period === 'month' ? set({ month: shiftMonth(rs.month, n) }) : set({ year: rs.year + n }));
-  return (
-    <div className="row-flex" style={{ justifyContent: 'space-between' }}>
-      <div className="monthnav">
-        <button className="iconbtn" aria-label="往前" onClick={() => shift(-1)}><Icon name="back" /></button>
-        <b>{label}</b>
-        <button className="iconbtn" aria-label="往後" onClick={() => shift(1)}><Icon name="chev" /></button>
-      </div>
-    </div>
-  );
+  return rs.period === 'month'
+    ? <PeriodNav mode="month" value={rs.month} onChange={(month) => set({ month })} label={label} />
+    : <PeriodNav mode="year" value={rs.year} onChange={(year) => set({ year })} label={label} />;
 }
 
 /** 點圓環的分類：有下一層 → 分類頁；最底層 → 明細頁 */

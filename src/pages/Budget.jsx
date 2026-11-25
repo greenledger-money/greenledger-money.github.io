@@ -3,7 +3,8 @@ import { useMemo, useState } from 'react';
 import { useLedger } from '../store.jsx';
 import { Icon, Page, Section, Tile, categoryIcon, go, useAction } from '../ui/kit.jsx';
 import { fmt } from '../lib/money.js';
-import { monthLabel, monthRange, shiftMonth, thisMonth, todayStr } from '../lib/dates.js';
+import { monthLabel, monthRange, thisMonth, todayStr } from '../lib/dates.js';
+import { PeriodNav } from '../ui/PeriodPicker.jsx';
 import { daysLeft, meter, monthsLeft, readBudget, spending } from '../lib/budget.js';
 
 /** 一條預算進度：已花／額度、進度條、剩多少；per＝{ n, text } 平均下來每天／每月可花 */
@@ -94,11 +95,7 @@ export default function Budget() {
 
   return (
     <Page title="預算" onBack={() => go('more')}>
-      <div className="monthnav" style={{ justifyContent: 'center' }}>
-        <button className="iconbtn" aria-label="上個月" onClick={() => setMonth(shiftMonth(month, -1))}><Icon name="back" /></button>
-        <b>{monthLabel(month)}</b>
-        <button className="iconbtn" aria-label="下個月" onClick={() => setMonth(shiftMonth(month, 1))}><Icon name="chev" /></button>
-      </div>
+      <PeriodNav mode="month" value={month} onChange={setMonth} label={monthLabel(month)} center />
 
       <Section title="預算額度">
         <div className="list">
