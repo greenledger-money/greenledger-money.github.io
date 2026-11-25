@@ -146,7 +146,7 @@ export function LedgerProvider({ backend, user, children }) {
       tablesRef.current = cached.tables; setTables(cached.tables);
       sharedRef.current = cached.shared; setShared(cached.shared);
       setStatus({ loading: false, refreshing: true, error: null, offline: false });
-    } else {
+    } else if (!tablesRef.current) {
       setStatus((s) => ({ ...s, loading: true, error: null }));
     }
     try {
@@ -185,6 +185,22 @@ export function LedgerProvider({ backend, user, children }) {
   }, [backend, user?.id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // 開著的時候：每 10 分鐘更新股價；切回 app 時（超過 2 分鐘沒看）整份重新抓，別台裝置記的帳也會出現
+  const lastLoad = useRef(Date.now());
+  useEffect(() => {
+    if (backend.kind !== 'supabase') return undefined;
+    const prices = setInterval(() => {
+      if (document.visibilityState === 'visible' && tablesRef.current) loadShared(tablesRef.current).catch(() => {});
+    }, 10 * 60e3);
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - lastLoad.current < 2 * 60e3) return;
+      lastLoad.current = Date.now();
+      load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(prices); document.removeEventListener('visibilitychange', onVisible); };
+  }, [backend, load, loadShared]);
 
   // ---------- 衍生資料 ----------
   const derived = useMemo(() => {

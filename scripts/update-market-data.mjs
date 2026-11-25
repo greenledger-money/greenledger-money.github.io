@@ -3,11 +3,13 @@
 //   1b. 美股收盤價：Stooq（免費、不用金鑰），抓不到改用 Yahoo Finance；一樣只存有人持有的代號
 //   2. 匯率：台灣銀行牌告匯率，存即期買賣的中間價（1 外幣 = ? 台幣）；
 //      台銀會擋 GitHub 的伺服器（回驗證頁），擋到時改用 open.er-api.com 的每日匯率
+//   3. 盤中（--intraday）：開盤時間每 10 分鐘抓一次持股的最新價（Yahoo Finance，約延遲 15–20 分鐘）
 // 寫入 Supabase 的 stock_prices、fx_rates（這兩張表只有 secret key 能寫）。
 //
 // 環境變數：SUPABASE_URL、SUPABASE_SECRET_KEY（放在 GitHub Actions Secrets，絕對不要放進前端）
 // 用法：node scripts/update-market-data.mjs              → 今天
 //       node scripts/update-market-data.mjs --fx-from=2023-10-29  → 另外補抓這天以後每天的匯率（CW 匯入外幣帳戶用）
+//       node scripts/update-market-data.mjs --intraday             → 盤中更新（只有開盤中的市場）
 
 const TWSE_URL = 'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL';
 const TPEX_URL = 'https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes';
@@ -100,6 +102,32 @@ export function parseYahooChart(json, symbol) {
   return null;
 }
 
+/** 現在哪些市場開盤中（台股 09:00–13:30 台北；美股 09:30–16:00 紐約），多抓 10 分鐘收尾 */
+export function openMarkets(now = new Date()) {
+  const parts = (tz) => {
+    const f = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(now);
+    const get = (t) => f.find((x) => x.type === t)?.value;
+    return { wd: get('weekday'), min: (Number(get('hour')) % 24) * 60 + Number(get('minute')) };
+  };
+  const weekday = (wd) => !['Sat', 'Sun'].includes(wd);
+  const tw = parts('Asia/Taipei'); const us = parts('America/New_York');
+  const out = [];
+  if (weekday(tw.wd) && tw.min >= 9 * 60 && tw.min <= 13 * 60 + 40) out.push('TW');
+  if (weekday(us.wd) && us.min >= 9 * 60 + 30 && us.min <= 16 * 60 + 10) out.push('US');
+  return out;
+}
+
+/** Yahoo chart 的即時報價（meta.regularMarketPrice）→ 今天的價格；日期用該市場當地時間 */
+export function parseYahooQuote(json, market, symbol) {
+  const m = json?.chart?.result?.[0]?.meta;
+  const price = Number(m?.regularMarketPrice);
+  const t = Number(m?.regularMarketTime);
+  if (!(price > 0) || !(t > 0)) return null;
+  const tz = market === 'TW' ? 'Asia/Taipei' : 'America/New_York';
+  const price_date = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t * 1000));
+  return { market, symbol: symbol.toUpperCase(), price_date, close: Math.round(price * 10000) / 10000, name: '' };
+}
+
 async function main() {
   const base = process.env.SUPABASE_URL?.replace(/\/$/, '');
   const key = process.env.SUPABASE_SECRET_KEY;
@@ -128,6 +156,32 @@ async function main() {
   };
 
   const today = taipeiToday();
+
+  // 盤中模式：只抓開盤中的市場、有人持有的代號；抓不到不算失敗（下一輪再試，收盤後的每日更新會補正式收盤價）
+  if (process.argv.includes('--intraday')) {
+    const markets = openMarkets();
+    if (!markets.length) { console.log('現在沒有市場開盤，略過'); return; }
+    for (const market of markets) {
+      const held = await rest(`stock_trades?select=symbol&market=eq.${market}`);
+      const wanted = [...new Set((held ?? []).map((r) => r.symbol.toUpperCase()))];
+      const rows = [];
+      for (const sym of wanted) {
+        // 台股要加 .TW（上市）或 .TWO（上櫃），不知道是哪個就兩個都試
+        const tries = market === 'TW' ? [`${sym}.TW`, `${sym}.TWO`] : [sym];
+        for (const y of tries) {
+          try {
+            const row = parseYahooQuote(await (await get(YAHOO_URL(y).replace('range=5d', 'range=1d'))).json(), market, sym);
+            if (row) { rows.push(row); break; }
+          } catch (e) { console.warn(`${y}：${e.message}`); }
+        }
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      await upsert('stock_prices', 'market,symbol,price_date', rows);
+      console.log(`${market} 盤中：${rows.length}/${wanted.length} 檔 ${rows.map((r) => `${r.symbol} ${r.close}`).join('、')}`);
+    }
+    return;
+  }
+
   const fxFrom = process.argv.find((a) => a.startsWith('--fx-from='))?.split('=')[1];
   let failures = 0;
 

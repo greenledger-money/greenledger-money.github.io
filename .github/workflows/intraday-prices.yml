@@ -1,0 +1,26 @@
+# 盤中股價：開盤時間每 10 分鐘抓一次持股的最新價（Yahoo Finance，約延遲 15–20 分鐘）
+# 收盤後由「每日更新股價與匯率」寫入正式收盤價。GitHub 的排程常會晚幾分鐘。
+name: 盤中股價
+on:
+  schedule:
+    - cron: '*/10 1-5 * * 1-5'     # 台股：台北 09:00–13:50
+    - cron: '*/10 13-21 * * 1-5'   # 美股：台北 21:30–05:50（涵蓋夏令與冬令時間，程式會再判斷）
+  workflow_dispatch:
+
+concurrency:
+  group: intraday-prices
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/update-market-data.mjs --intraday
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://qopkoivdrildkdihnyto.supabase.co' }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}

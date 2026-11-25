@@ -1,6 +1,6 @@
 // 每日更新腳本的解析器（用固定樣本測，不連網路）
 import { describe, expect, test } from 'bun:test';
-import { parseBotCsv, parseErApi, parseTwDate, parseTwPrices, taipeiToday, parseStooqCsv, parseYahooChart } from '../scripts/update-market-data.mjs';
+import { parseBotCsv, parseErApi, parseTwDate, parseTwPrices, taipeiToday, parseStooqCsv, parseYahooChart, openMarkets, parseYahooQuote } from '../scripts/update-market-data.mjs';
 
 describe('股價、匯率解析', () => {
   test('民國／西元日期', () => {
@@ -57,4 +57,19 @@ test('美股：Yahoo chart 取最後一個有收盤價的交易日（紐約日�
   const json = { chart: { result: [{ timestamp: [1763994600, 1764081000], indicators: { quote: [{ close: [100.123456, null] }] } }] } };
   expect(parseYahooChart(json, 'tsm')).toEqual({ market: 'US', symbol: 'TSM', price_date: '2025-11-24', close: 100.1235, name: '' });
   expect(parseYahooChart({ chart: { result: null } }, 'TSM')).toBeNull();
+});
+
+test('盤中：哪些市場開盤中', () => {
+  expect(openMarkets(new Date('2026-11-25T02:00:00Z'))).toEqual(['TW']);      // 台北週三 10:00
+  expect(openMarkets(new Date('2026-11-25T06:00:00Z'))).toEqual([]);          // 台北 14:00 收盤
+  expect(openMarkets(new Date('2026-11-25T15:00:00Z'))).toEqual(['US']);      // 紐約週三 10:00
+  expect(openMarkets(new Date('2026-11-28T02:00:00Z'))).toEqual([]);          // 台北週六
+  expect(openMarkets(new Date('2026-07-01T13:45:00Z'))).toEqual(['US']);      // 夏令時間：紐約 09:45
+});
+
+test('盤中：Yahoo 即時價，日期用當地時間', () => {
+  const j = (price, time) => ({ chart: { result: [{ meta: { regularMarketPrice: price, regularMarketTime: time } }] } });
+  expect(parseYahooQuote(j(1085, 1764036000), 'TW', '2330')).toEqual({ market: 'TW', symbol: '2330', price_date: '2025-11-25', close: 1085, name: '' });
+  expect(parseYahooQuote(j(262.7812345, 1764086400), 'US', 'qqqm')).toEqual({ market: 'US', symbol: 'QQQM', price_date: '2025-11-25', close: 262.7812, name: '' });
+  expect(parseYahooQuote({ chart: { result: [{ meta: {} }] } }, 'TW', '2330')).toBeNull();
 });
