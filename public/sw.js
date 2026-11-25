@@ -1,5 +1,5 @@
 // Service Worker：快取 app 本身，讓它可以加入主畫面、沒網路時也能打開（看最後一次的資料）。
-// 記帳資料不經過這裡快取（由 app 自己存最後一次的快照）。
+// 記帳資料不經過這裡快取（由 app 自己存最後一次的快照；離線記的帳存在「待上傳」，有網路再送）。
 const VERSION = '__VERSION__';
 const PRECACHE = __PRECACHE__;
 const CACHE = `ledger-${VERSION}`;

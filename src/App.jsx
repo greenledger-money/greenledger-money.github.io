@@ -87,16 +87,18 @@ function Shell({ openEntry }) {
   return (
     <div className="app">
       {status.warning && <div className="notice warn banner" style={{ marginTop: 'calc(env(safe-area-inset-top) + 8px)' }}>{status.warning}</div>}
-      {status.offline && (
+      {status.offline ? (
         <div className="notice warn banner" style={{ marginTop: 'calc(env(safe-area-inset-top) + 8px)' }}>
-          離線中：顯示 {status.snapshotAt ? new Date(status.snapshotAt).toLocaleString('zh-TW', { hour12: false }) : '上次'} 的資料，只能查看，不能記帳。
+          離線中：記的帳先存在手機，有網路會自動上傳{status.queued ? `（${status.queued} 筆待上傳）` : ''}
         </div>
+      ) : status.queued > 0 && (
+        <div className="notice banner" style={{ marginTop: 'calc(env(safe-area-inset-top) + 8px)' }}>{status.queued} 筆離線記的帳上傳中…</div>
       )}
       {page}
       <div className="tabbar">
         <nav aria-label="主選單">
           {TABS.map((t) => (t.name === 'add' ? (
-            <button key={t.name} className="tab tab-add" aria-label="記一筆" onClick={() => openEntry({})} disabled={status.offline}>
+            <button key={t.name} className="tab tab-add" aria-label="記一筆" onClick={() => openEntry({})}>
               <span><Icon name="plus" /></span>
             </button>
           ) : (

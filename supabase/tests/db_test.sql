@@ -222,6 +222,32 @@ select t.throws($$insert into public.transactions (type, account_id, amount, cat
 select t.throws($$update public.accounts set user_id = 'aaaaaaaa-0000-0000-0000-000000000001'$$,
   'row-level|policy', 'B 不能把自己的資料改成 A 的');
 
+-- ================= 捷徑／信箱記帳碼 =================
+-- B 產生記帳碼（App 只存雜湊）
+insert into public.inbox_tokens (token_hash, label) values (encode(extensions.digest('b-token-0123456789-0123456789-0123456789', 'sha256'), 'hex'), 'iPhone');
+select t.ok((select count(*) from public.inbox_tokens) = 1, '記帳碼：自己看得到自己的');
+insert into public.categories (kind, name) values ('income', '飲食');  -- 同名的收入分類不能被拿去記支出
+select t.as_user(null);
+select t.throws($$select public.inbox_add('wrong-token-0123456789-0123456789-0123', '{"amount":"100","category":"飲食"}')$$, '記帳碼不對', '捷徑：記帳碼錯的不能寫');
+select t.throws($$select count(*) from public.inbox_tokens$$, 'permission', '未登入讀不到記帳碼');
+select t.throws($$select public.inbox_find_category('bbbbbbbb-0000-0000-0000-000000000002', 'expense', '飲食')$$, 'permission', '未登入不能直接呼叫找分類');
+select t.ok((public.inbox_add('b-token-0123456789-0123456789-0123456789', '{"amount":"NT$120","category":"飲食","account":"現金","note":"捷徑午餐"}'))->>'status' = 'recorded', '捷徑：分類、帳戶對得到 → 直接記一筆');
+select t.ok((public.inbox_add('b-token-0123456789-0123456789-0123456789', '{"amount":"88","category":"不存在的分類"}'))->>'status' = 'pending', '捷徑：分類對不到 → 進待確認');
+select t.ok((public.inbox_add('b-token-0123456789-0123456789-0123456789', '{"kind":"email","amount":"3,280","merchant":"全聯","message_id":"m1"}'))->>'status' = 'pending', '信箱：消費通知進待確認');
+select public.inbox_add('b-token-0123456789-0123456789-0123456789', '{"kind":"email","amount":"3,280","merchant":"全聯","message_id":"m1"}');
+select t.throws($$select public.inbox_add('b-token-0123456789-0123456789-0123456789', '{"amount":"0","category":"飲食"}')$$, '金額', '捷徑：金額 0 不行');
+select t.as_user('bbbbbbbb-0000-0000-0000-000000000002');
+select t.ok((select count(*) from public.transactions where source = 'shortcut' and amount = 120 and note = '捷徑午餐' and category_id = 'cb000000-0000-0000-0000-000000000001') = 1, '捷徑記的那筆在 B 的帳上');
+select t.ok((select count(*) from public.pending_items where source = 'email') = 1, '同一封信只進一次待確認');
+select t.ok((select count(*) from public.pending_items where source = 'shortcut' and (payload->>'amount')::numeric = 88) = 1, '對不到分類的捷徑在待確認');
+select t.ok((select last_used_at is not null from public.inbox_tokens limit 1), '記帳碼記錄最後使用時間');
+select set_config('role', 'postgres', false);
+select t.ok((select count(*) from public.transactions where source = 'shortcut' and user_id = 'aaaaaaaa-0000-0000-0000-000000000001') = 0, '捷徑不會寫到別人帳上');
+select t.as_user('bbbbbbbb-0000-0000-0000-000000000002');
+-- 朋友欠款：交易可以記「誰」
+insert into public.transactions (type, account_id, amount, category_id, counterparty) values ('expense','b0000000-0000-0000-0000-00000000000c', 10, 'cb000000-0000-0000-0000-000000000001', '小明');
+select t.ok((select count(*) from public.transactions where counterparty = '小明') = 1, '交易可以記對象');
+
 -- ================= 未登入 =================
 select t.as_user(null);
 select t.throws($$select count(*) from public.accounts$$, 'permission', '未登入不能讀帳戶');

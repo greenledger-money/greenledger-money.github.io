@@ -1,5 +1,7 @@
 -- 在一般 Postgres 上模擬 Supabase 的 auth 環境，只給測試用（不要在 Supabase 上跑）
 create schema if not exists auth;
+create schema if not exists extensions;
+grant usage on schema extensions to anon, authenticated, service_role;
 create table if not exists auth.users (id uuid primary key, email text);
 create or replace function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid

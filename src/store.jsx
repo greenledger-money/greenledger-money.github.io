@@ -4,6 +4,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { TABLES, applyDelete, planDelete } from './data/relations.js';
 import { friendlyError } from './data/errors.js';
+import { OFFLINE_TABLES, applyOp, applyOps, flushOps, isNetworkError, readOutbox, stampRows, writeOutbox } from './data/outbox.js';
 import { buildTree } from './lib/categories.js';
 import { makeFx } from './lib/fx.js';
 import { computeBalances, netWorth, buildSplit, buildFee, uid } from './lib/ledger.js';
@@ -17,7 +18,7 @@ const Ctx = createContext(null);
 export const useLedger = () => useContext(Ctx);
 
 const snapKey = (id) => `ledger.snapshot.${id}`;
-const isNetwork = (e) => /fetch|network|Load failed|offline/i.test(String(e?.message ?? e)) || !navigator.onLine;
+const isNetwork = isNetworkError;
 
 function mergeById(list, rows) {
   const key = (r) => r.id ?? r.user_id;
@@ -44,13 +45,64 @@ export function LedgerProvider({ backend, user, children }) {
   const writes = useRef(0);
   const commit = (fn) => { writes.current += 1; const next = fn(tablesRef.current); tablesRef.current = next; setTables(next); };
 
+  // ---------- 離線待上傳 ----------
+  const statusRef = useRef(status);
+  statusRef.current = status;
+  const outbox = useRef(readOutbox(user.id));
+  const [queued, setQueued] = useState(outbox.current.length);
+  const setOutbox = (ops) => { outbox.current = ops; writeOutbox(user.id, ops); setQueued(ops.length); };
+  /** 交易在沒網路（或前面還有沒傳完的）時先排隊；回傳 true 表示已排隊 */
+  const shouldQueue = (table) => OFFLINE_TABLES.has(table) && (statusRef.current.offline || outbox.current.length > 0);
+  const enqueue = (op) => {
+    setOutbox([...outbox.current, op]);
+    commit((t) => applyOp(t, op));
+    flush();
+  };
+  const flushing = useRef(null);
+  const flush = useCallback(() => {
+    if (flushing.current || !outbox.current.length || backend.offline) return flushing.current;
+    flushing.current = (async () => {
+      try {
+        while (outbox.current.length) {
+          const ops = outbox.current;
+          const { remaining, failed } = await flushOps(backend, ops);
+          // 上傳期間又有新的排進來：保留新的
+          const added = outbox.current.slice(ops.length);
+          setOutbox([...remaining, ...added]);
+          if (failed.length) {
+            setStatus((s) => ({ ...s, warning: `有 ${failed.length} 筆離線記的帳上傳失敗：${friendlyError(failed[0].error)}` }));
+          }
+          if (remaining.length) return false;
+        }
+        if (statusRef.current.offline) setStatus((s) => ({ ...s, offline: false }));
+        return true;
+      } finally { flushing.current = null; }
+    })();
+    return flushing.current;
+  }, [backend]);
+
   // ---------- 低階寫入（同步畫面上的資料） ----------
-  const guard = () => { if (status.offline) throw new Error('離線中，只能查看，不能修改'); };
+  const guard = (table) => {
+    if (table && OFFLINE_TABLES.has(table)) return;
+    if (statusRef.current.offline) throw new Error('離線中：記帳可以，其他設定要等有網路再改');
+  };
 
   const insertRows = useCallback(async (table, rows, opts) => {
-    guard();
+    guard(table);
     if (!rows.length) return [];
-    const saved = await backend.insert(table, rows, opts);
+    const queue = () => {
+      const stamped = stampRows(rows, user.id);
+      enqueue({ op: 'insert', table, rows: stamped });
+      const confirmed = new Set(stamped.map((r) => r.pending_item_id).filter(Boolean));
+      if (confirmed.size) commit((t) => ({ ...t, pending_items: t.pending_items.map((p) => (confirmed.has(p.id) ? { ...p, status: 'confirmed' } : p)) }));
+      return stamped;
+    };
+    if (shouldQueue(table)) return queue();
+    let saved;
+    try { saved = await backend.insert(table, rows, opts); } catch (e) {
+      if (OFFLINE_TABLES.has(table) && isNetwork(e)) { setStatus((s) => ({ ...s, offline: true })); return queue(); }
+      throw e;
+    }
     commit((t) => {
       let next = { ...t, [table]: mergeById(t[table], saved) };
       // 資料庫觸發器會把確認過的待確認項目改成「已確認」，畫面同步一下
@@ -64,18 +116,28 @@ export function LedgerProvider({ backend, user, children }) {
   }, [backend, status.offline]);
 
   const updateRow = useCallback(async (table, id, patch) => {
-    guard();
-    const row = await backend.update(table, id, patch);
+    guard(table);
+    const queue = () => { enqueue({ op: 'update', table, id, patch }); return tablesRef.current[table].find((r) => r.id === id); };
+    if (shouldQueue(table)) return queue();
+    let row;
+    try { row = await backend.update(table, id, patch); } catch (e) {
+      if (OFFLINE_TABLES.has(table) && isNetwork(e)) { setStatus((s) => ({ ...s, offline: true })); return queue(); }
+      throw e;
+    }
     commit((t) => ({ ...t, [table]: mergeById(t[table], [row]) }));
     return row;
   }, [backend, status.offline]);
 
   const removeRows = useCallback(async (table, ids) => {
-    guard();
+    guard(table);
     if (!ids.length) return;
     const plan = planDelete(tablesRef.current, table, ids);
     if (plan.blocked) throw new Error(plan.blocked);
-    await backend.remove(table, ids);
+    if (shouldQueue(table)) { enqueue({ op: 'remove', table, ids }); return; }
+    try { await backend.remove(table, ids); } catch (e) {
+      if (OFFLINE_TABLES.has(table) && isNetwork(e)) { setStatus((s) => ({ ...s, offline: true })); enqueue({ op: 'remove', table, ids }); return; }
+      throw e;
+    }
     commit((t) => applyDelete(t, plan));
   }, [backend, status.offline]);
 
@@ -143,6 +205,7 @@ export function LedgerProvider({ backend, user, children }) {
       try { cached = JSON.parse(localStorage.getItem(snapKey(user.id)) || 'null'); } catch { /* ignore */ }
     }
     if (cached?.tables) {
+      cached.tables = applyOps(cached.tables, outbox.current);
       tablesRef.current = cached.tables; setTables(cached.tables);
       sharedRef.current = cached.shared; setShared(cached.shared);
       setStatus({ loading: false, refreshing: true, error: null, offline: false });
@@ -150,6 +213,8 @@ export function LedgerProvider({ backend, user, children }) {
       setStatus((s) => ({ ...s, loading: true, error: null }));
     }
     try {
+      // 先把離線時記的帳傳上去，再抓最新資料
+      if (outbox.current.length && (await flush()) === false) throw new Error('offline');
       let t;
       for (let i = 0; i < 3; i++) {
         const before = writes.current;
@@ -173,7 +238,8 @@ export function LedgerProvider({ backend, user, children }) {
       let snap = null;
       try { snap = JSON.parse(localStorage.getItem(snapKey(user.id)) || 'null'); } catch { /* ignore */ }
       if (snap && isNetwork(e)) {
-        setTables(snap.tables); setShared(snap.shared);
+        const offTables = applyOps(snap.tables, outbox.current);
+        tablesRef.current = offTables; setTables(offTables); setShared(snap.shared);
         setStatus({ loading: false, refreshing: false, error: null, offline: true, snapshotAt: snap.at });
       } else if (cached?.tables) {
         // 已經用快取打開了：不要整個畫面變錯誤頁，顯示提醒就好
@@ -199,7 +265,14 @@ export function LedgerProvider({ backend, user, children }) {
       load();
     };
     document.addEventListener('visibilitychange', onVisible);
-    return () => { clearInterval(prices); document.removeEventListener('visibilitychange', onVisible); };
+    // 網路回來：先上傳離線記的帳，再整份重新抓
+    const onOnline = () => {
+      if (backend.offline) { location.reload(); return; }
+      lastLoad.current = Date.now();
+      load();
+    };
+    window.addEventListener('online', onOnline);
+    return () => { clearInterval(prices); document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('online', onOnline); };
   }, [backend, load, loadShared]);
 
   // ---------- 衍生資料 ----------
@@ -538,7 +611,8 @@ export function LedgerProvider({ backend, user, children }) {
     };
   }, [derived, insertRows, updateRow, removeRows, load]);
 
-  const value = useMemo(() => ({ backend, user, status, data: derived, actions }), [backend, user, status, derived, actions]);
+  const fullStatus = useMemo(() => ({ ...status, queued }), [status, queued]);
+  const value = useMemo(() => ({ backend, user, status: fullStatus, data: derived, actions }), [backend, user, fullStatus, derived, actions]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
