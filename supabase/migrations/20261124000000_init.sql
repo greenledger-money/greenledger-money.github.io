@@ -260,6 +260,7 @@ create table public.stock_prices (
   price_date date not null,
   close      numeric(18,6) not null,
   name       text not null default '',
+  updated_at timestamptz default now(),   -- 最後寫入時間（股票頁顯示「更新於…」）
   primary key (market, symbol, price_date)
 );
 
@@ -267,6 +268,7 @@ create table public.fx_rates (
   currency  char(3) not null check (currency ~ '^[A-Z]{3}$'),
   rate_date date not null,
   rate      numeric(18,8) not null check (rate > 0),   -- 1 單位外幣 = ? 台幣（台銀即期買賣中價）
+  updated_at timestamptz default now(),
   primary key (currency, rate_date)
 );
 
@@ -389,6 +391,10 @@ begin
 end $$;
 
 create trigger transactions_touch before update on public.transactions
+  for each row execute function public.touch_updated_at();
+create trigger stock_prices_touch before update on public.stock_prices
+  for each row execute function public.touch_updated_at();
+create trigger fx_rates_touch before update on public.fx_rates
   for each row execute function public.touch_updated_at();
 
 -- 確認待確認項目：產生交易（或股票成交）時，在同一個 transaction 裡把項目標成已確認。

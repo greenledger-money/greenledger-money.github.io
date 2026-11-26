@@ -97,3 +97,19 @@ export function timeLabel(iso) {
   const d = new Date(iso);
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+/** 「多久以前更新」：剛剛、5 分鐘前、今天 14:30、昨天 21:10、11/24 13:50、2025/12/31 */
+export function updatedLabel(iso, now = new Date()) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const mins = Math.floor((now - d) / 60000);
+  if (mins < 1) return '剛剛';
+  if (mins < 60) return `${mins} 分鐘前`;
+  const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  if (ymd(d) === ymd(now)) return `今天 ${hm}`;
+  const y = new Date(now); y.setDate(y.getDate() - 1);
+  if (ymd(d) === ymd(y)) return `昨天 ${hm}`;
+  if (d.getFullYear() === now.getFullYear()) return `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+}

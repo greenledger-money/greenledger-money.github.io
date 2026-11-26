@@ -65,7 +65,7 @@ export function makePriceBook(stockPrices = [], manualPrices = []) {
   const add = (r, source) => {
     const k = `${r.market}|${r.symbol}`;
     if (!map.has(k)) map.set(k, []);
-    map.get(k).push({ date: r.price_date, close: Number(r.close), source, name: r.name });
+    map.get(k).push({ date: r.price_date, close: Number(r.close), source, name: r.name, updatedAt: r.updated_at ?? r.created_at ?? null });
   };
   stockPrices.forEach((r) => add(r, 'auto'));
   manualPrices.forEach((r) => add(r, 'manual'));
@@ -83,6 +83,17 @@ export function makePriceBook(stockPrices = [], manualPrices = []) {
   return { lookup, name };
 }
 
+/** 一組持股的股價狀態：最新的股價日期、最後一次寫入股價的時間（舊資料沒有時間就是 null） */
+export function priceFreshness(rows) {
+  let date = null; let at = null;
+  for (const r of rows) {
+    if (r.priceSource === 'cost') continue;
+    if (r.priceDate && (!date || r.priceDate > date)) date = r.priceDate;
+    if (r.priceUpdatedAt && (!at || new Date(r.priceUpdatedAt) > new Date(at))) at = r.priceUpdatedAt;
+  }
+  return { date, at };
+}
+
 /** 持股估值。date 不給 = 用最新股價、最新匯率 */
 export function valuePositions(pos, priceBook, fx, date) {
   const rows = [];
@@ -93,7 +104,7 @@ export function valuePositions(pos, priceBook, fx, date) {
     const rate = p.currency === 'TWD' ? 1 : ((date ? fx.rateOn(p.currency, date) : null) ?? fx.latest(p.currency) ?? 0);
     const mv = p.shares * price;
     rows.push({
-      ...p, price, priceDate: q?.date ?? null, priceSource: q?.source ?? 'cost',
+      ...p, price, priceDate: q?.date ?? null, priceUpdatedAt: q?.updatedAt ?? null, priceSource: q?.source ?? 'cost',
       marketValue: round2(mv), unrealized: round2(mv - p.cost),
       returnPct: p.cost > 0 ? (mv - p.cost) / p.cost : 0,
       rate, marketValueTwd: round2(mv * rate), costTwd: round2(p.cost * rate),

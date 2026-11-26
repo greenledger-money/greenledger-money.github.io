@@ -420,3 +420,33 @@ test('只看例外：counts 的 only 模式', () => {
   expect([counts(normal, acc, false), counts(exc, acc, false)]).toEqual([true, false]);
   expect([counts(normal, acc, 'only'), counts(exc, acc, 'only')]).toEqual([false, true]);
 });
+
+describe('股價更新時間', () => {
+  test('updatedLabel：剛剛、幾分鐘前、今天、昨天、今年、往年', async () => {
+    const { updatedLabel } = await import('../src/lib/dates.js');
+    const now = new Date(2026, 10, 27, 2, 20);
+    expect(updatedLabel(null, now)).toBe('');
+    expect(updatedLabel(new Date(2026, 10, 27, 2, 19, 40).toISOString(), now)).toBe('剛剛');
+    expect(updatedLabel(new Date(2026, 10, 27, 2, 10).toISOString(), now)).toBe('10 分鐘前');
+    expect(updatedLabel(new Date(2026, 10, 27, 0, 30).toISOString(), now)).toBe('今天 00:30');
+    expect(updatedLabel(new Date(2026, 10, 26, 13, 50).toISOString(), now)).toBe('昨天 13:50');
+    expect(updatedLabel(new Date(2026, 10, 24, 8, 5).toISOString(), now)).toBe('11/24 08:05');
+    expect(updatedLabel(new Date(2025, 11, 31, 8, 5).toISOString(), now)).toBe('2025/12/31');
+  });
+  test('priceFreshness：取最新的股價日期和寫入時間，沒股價的不算', async () => {
+    const { priceFreshness } = await import('../src/lib/stocks.js');
+    const pos = runFifo([{ id: '1', brokerage_account_id: 'tw', market: 'TW', symbol: '2330', side: 'opening', trade_date: '2026-01-01', shares: 1000, price: 100, fee: 0, tax: 0, currency: 'TWD' },
+      { id: '2', brokerage_account_id: 'tw', market: 'TW', symbol: '0050', side: 'opening', trade_date: '2026-01-01', shares: 1000, price: 100, fee: 0, tax: 0, currency: 'TWD' },
+      { id: '3', brokerage_account_id: 'tw', market: 'TW', symbol: '2317', side: 'opening', trade_date: '2026-01-01', shares: 1000, price: 100, fee: 0, tax: 0, currency: 'TWD' }]);
+    const pb = makePriceBook([
+      { market: 'TW', symbol: '2330', price_date: '2026-11-26', close: 150, updated_at: '2026-11-26T05:50:00Z' },
+      { market: 'TW', symbol: '0050', price_date: '2026-11-25', close: 90, updated_at: '2026-11-26T08:30:00Z' },
+    ]);
+    const rows = valuePositions(pos, pb, makeFx([]));
+    expect(rows.find((r) => r.symbol === '2330').priceUpdatedAt).toBe('2026-11-26T05:50:00Z');
+    expect(priceFreshness(rows)).toEqual({ date: '2026-11-26', at: '2026-11-26T08:30:00Z' });
+    // 舊資料沒有寫入時間
+    const old = valuePositions(pos, makePriceBook([{ market: 'TW', symbol: '2330', price_date: '2026-11-20', close: 150 }]), makeFx([]));
+    expect(priceFreshness(old)).toEqual({ date: '2026-11-20', at: null });
+  });
+});

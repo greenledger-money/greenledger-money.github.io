@@ -4,11 +4,20 @@ import { useLedger } from '../store.jsx';
 import { Empty, Field, Icon, Item, Page, Section, Seg, Sheet, back, go, useAction, useUI } from '../ui/kit.jsx';
 import { Donut } from '../ui/charts.jsx';
 import { AccountSelect } from '../ui/pickers.jsx';
-import { allocation, currencyOfMarket, defaultSettleDate, estimateNhi, estimateTwFee, estimateTwTax, guessKind, marketOfAccount, tradeNetAmount } from '../lib/stocks.js';
+import { allocation, currencyOfMarket, priceFreshness, defaultSettleDate, estimateNhi, estimateTwFee, estimateTwTax, guessKind, marketOfAccount, tradeNetAmount } from '../lib/stocks.js';
 import { fmt, pct, round2, shares as fmtShares } from '../lib/money.js';
-import { dayLabel, todayStr } from '../lib/dates.js';
+import { dayLabel, todayStr, updatedLabel } from '../lib/dates.js';
 
 const SIDE = { opening: '期初持股', buy: '買進', sell: '賣出' };
+
+/** 股價什麼時候更新：「股價 11/26 · 更新於 今天 13:50」；舊資料沒有更新時間就只顯示股價日期 */
+function priceStamp(rows, { short = false } = {}) {
+  const { date, at } = priceFreshness(rows);
+  if (!date) return '';
+  const when = at ? updatedLabel(at) : '';
+  if (short) return when ? `更新 ${when}` : `股價 ${date.slice(5).replace('-', '/')}`;
+  return `股價日期 ${date.slice(5).replace('-', '/')}${when ? ` · 更新於 ${when}` : ''}`;
+}
 
 function usePnl() {
   const { data } = useLedger();
@@ -279,7 +288,7 @@ export default function Stocks() {
               const cost = list.reduce((x, r) => x + r.costTwd, 0) / rate;
               return (
                 <Item key={b.id} onClick={() => go('account', b.id)} title={b.name}
-                  sub={`持股 ${list.length} 檔${b.currency !== 'TWD' ? ` · ${b.currency}` : ''}`}
+                  sub={[`持股 ${list.length} 檔`, b.currency !== 'TWD' && b.currency, priceStamp(list, { short: true })].filter(Boolean).join(' · ')}
                   value={<span className="num">{fmt(mv, b.currency)}</span>}
                   valueSub={<span className={`num ${pnlCls(mv - cost)}`}>{fmt(mv - cost, b.currency, { sign: true })}（{cost ? pct((mv - cost) / cost) : '—'}）</span>} />
               );
@@ -334,6 +343,7 @@ export function StockDetail({ id }) {
           <div className="label">{data.accById.get(accountId)?.name} · {pos.kind === 'etf' ? 'ETF' : market === 'TW' ? '台股' : '美股'}</div>
           <div className="big num">{fmt(row?.marketValue ?? 0, cur)}</div>
           {cur !== 'TWD' && row && <div className="small muted">≈ {fmt(row.marketValueTwd)}</div>}
+          {row && priceStamp([row]) && <div className="small muted">{priceStamp([row])}</div>}
         </div>
         <div className="stats">
           <div><span className="label">股數</span><b className="num">{fmtShares(pos.shares)}</b></div>
@@ -390,7 +400,7 @@ export function BrokerageView({ account }) {
   const cost = rows.reduce((x, r) => x + r.costTwd, 0) / rate;
   const pnl = mv - cost;
   const twd = rows.reduce((x, r) => x + r.marketValueTwd, 0);
-  const last = rows.map((r) => r.priceDate).filter(Boolean).sort().pop();
+  const stamp = priceStamp(rows);
   const market = marketOfAccount(account);
   const noPrice = rows.filter((r) => r.priceSource === 'cost');
   return (
@@ -432,7 +442,7 @@ export function BrokerageView({ account }) {
           )) : <Empty>還沒有持股</Empty>}
         </div>
       </Section>
-      {last && <p className="small muted right" style={{ margin: 0 }}>股價日期：{last}</p>}
+      {stamp && <p className="small muted right" style={{ margin: 0 }}>{stamp}</p>}
       {sheet?.kind === 'div' && <DividendSheet initial={{ brokerage_account_id: account.id, market }} onClose={() => setSheet(null)} />}
       {sheet?.kind === 'price' && <PriceSheet market={market} onClose={() => setSheet(null)} />}
     </>

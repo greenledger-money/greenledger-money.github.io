@@ -38,6 +38,17 @@ insert into auth.users values
   ('bbbbbbbb-0000-0000-0000-000000000002', 'b@test');
 insert into public.fx_rates values ('USD', '2026-11-20', 32.1);
 
+-- 股價：記下最後寫入時間（排程 upsert 覆寫時也要更新）
+insert into public.stock_prices (market, symbol, price_date, close) values ('TW', '0050', '2026-11-20', 100);
+select t.ok((select updated_at from public.stock_prices where symbol = '0050') is not null, '新增股價時記下寫入時間');
+alter table public.stock_prices disable trigger stock_prices_touch;  -- 先把時間改成很久以前
+update public.stock_prices set updated_at = '2000-01-01' where symbol = '0050';
+alter table public.stock_prices enable trigger stock_prices_touch;
+insert into public.stock_prices (market, symbol, price_date, close) values ('TW', '0050', '2026-11-20', 101)
+  on conflict (market, symbol, price_date) do update set close = excluded.close;
+select t.ok((select updated_at > '2000-01-02' from public.stock_prices where symbol = '0050'), '覆寫同一天的股價時更新寫入時間');
+delete from public.stock_prices where symbol = '0050';
+
 -- ================= 使用者 A =================
 select t.as_user('aaaaaaaa-0000-0000-0000-000000000001');
 
