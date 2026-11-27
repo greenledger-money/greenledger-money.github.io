@@ -8,6 +8,7 @@ import { counts, summarize, twdOf } from '../lib/ledger.js';
 import { fmt } from '../lib/money.js';
 import { addDays, dayLabel, localDate, monthRange, parseYmd, todayStr } from '../lib/dates.js';
 import { describe } from '../lib/recurring.js';
+import { useBackupHealth } from '../ui/useBackup.js';
 
 export function PendingList() {
   const { data, actions } = useLedger();
@@ -169,6 +170,7 @@ export default function Home() {
   const shiftWeek = (n) => setDay(addDays(day, 7 * n));
   const [y, m] = month.split('-').map(Number);
 
+  const backup = useBackupHealth();
   const add = () => openEntry(day === today ? {} : { initial: { type: 'expense', occurred_at: new Date(`${day}T12:00:00`).toISOString() } });
 
   return (
@@ -179,6 +181,11 @@ export default function Home() {
       </label>
       <button className="iconbtn" aria-label="設定" onClick={() => go('settings')}><Icon name="gear" /></button>
     </>}>
+      {backup?.warning && (
+        <button type="button" className="notice warn row-flex" style={{ width: '100%', textAlign: 'left', font: 'inherit', border: 0, cursor: 'pointer' }} onClick={() => go('settings')}>
+          <span className="grow">備份提醒：{backup.warning}</span><Icon name="chev" className="chev" />
+        </button>
+      )}
       {homeShowWorth && <WorthCard />}
       <div className="card" style={{ padding: '10px 8px 14px', display: 'grid', gap: 12 }}
         onTouchStart={(e) => { touch.current = e.touches[0].clientX; }}

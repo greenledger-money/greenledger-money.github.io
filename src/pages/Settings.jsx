@@ -7,6 +7,23 @@ import { toCSV, transactionsToRows } from '../lib/csv.js';
 import { monthRange, thisMonth, todayStr, ymd } from '../lib/dates.js';
 import { friendlyError } from '../data/errors.js';
 import { APP } from '../config.js';
+import { useBackupHealth } from '../ui/useBackup.js';
+
+// ---------------------------------------------------------------------
+/** 自動備份：每天在資料庫存快照，再加密存一份到私人 GitHub repo */
+function BackupSection() {
+  const h = useBackupHealth();
+  if (!h) return null;
+  return (
+    <Section title="自動備份">
+      <div className="list">
+        <Item left={<Tile name="download" />} title="資料庫快照" sub="每天 03:05，留 30 天＋每月一份" value={<span className="small">{h.snapshot}</span>} />
+        <Item left={<Tile name="download" />} title="異地備份" sub="加密存到私人 GitHub repo" value={<span className="small">{h.offsite}</span>} />
+      </div>
+      {h.warning && <div className="notice warn" role="alert">{h.warning}</div>}
+    </Section>
+  );
+}
 
 // ---------------------------------------------------------------------
 export function Export() {
@@ -151,6 +168,7 @@ export function Settings() {
           <Item left={<Tile name="user" />} title={user.demo ? '試用模式' : user.email} sub={user.demo ? '資料只存在這台裝置的瀏覽器' : '用 Email 登入'} />
         </div>
       </Section>
+      {!user.demo && <BackupSection />}
       {!user.demo && (
         <Section title="Passkey（Face ID 登入）">
           <div style={{ display: 'grid', gap: 10 }}><Passkeys /></div>

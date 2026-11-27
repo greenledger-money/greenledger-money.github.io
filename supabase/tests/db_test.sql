@@ -268,6 +268,29 @@ select t.as_user(null);
 select t.throws($$select count(*) from public.accounts$$, 'permission', '未登入不能讀帳戶');
 select t.throws($$select public.delete_my_account()$$, 'permission', '未登入不能呼叫刪帳號');
 
+-- ================= 備份與還原 =================
+select set_config('role', 'postgres', false);
+create temp table t_backup as select backup.user_checksum('aaaaaaaa-0000-0000-0000-000000000001') as sum_a;
+select backup.take_snapshot('manual');
+select t.ok((select checksum = md5(data::text) and (counts->>'transactions')::int > 0 from backup.snapshots order by id desc limit 1), '快照：存下全部資料，校驗碼對得上');
+select t.throws($$select backup.restore((select data from backup.snapshots order by id desc limit 1), 'aaaaaaaa-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001')$$,
+  '已經有交易', '帳號已經有資料時，不加 force 不會覆蓋');
+-- 模擬誤刪：交易全刪、帳戶改名
+delete from public.transactions where user_id = 'aaaaaaaa-0000-0000-0000-000000000001';
+update public.accounts set name = name || '（改壞了）' where user_id = 'aaaaaaaa-0000-0000-0000-000000000001';
+select t.ok(backup.user_checksum('aaaaaaaa-0000-0000-0000-000000000001') <> (select sum_a from t_backup), '誤刪之後資料不一樣了');
+select backup.restore_snapshot((select max(id) from backup.snapshots where reason = 'manual'), 'aaaaaaaa-0000-0000-0000-000000000001');
+select t.ok(backup.user_checksum('aaaaaaaa-0000-0000-0000-000000000001') = (select sum_a from t_backup), '用快照還原後，資料跟原本完全一樣');
+select t.ok((select count(*) from backup.snapshots where reason = 'before_restore') = 1, '覆蓋前自動再存一份快照（還原本身也能復原）');
+select t.ok((select count(*) from pg_trigger where tgrelid = 'public.transactions'::regclass and not tgisinternal and tgenabled = 'D') = 0, '還原完觸發器都恢復');
+select t.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+select t.ok((public.backup_status()->>'snapshot_at') is not null, '登入的人看得到上次備份時間');
+select t.throws($$select count(*) from backup.snapshots$$, 'permission', '一般使用者讀不到快照內容');
+select t.throws($$select public.backup_latest()$$, 'permission', '一般使用者不能匯出備份');
+select t.throws($$select public.backup_mark_offsite(true, 'x')$$, 'permission', '一般使用者不能改備份紀錄');
+select t.as_user(null);
+select t.throws($$select public.backup_status()$$, 'permission', '未登入看不到備份狀態');
+
 -- ================= 刪除帳號 =================
 select t.as_user('aaaaaaaa-0000-0000-0000-000000000001');
 select public.delete_my_account();
@@ -280,6 +303,15 @@ select t.ok((select count(*) from public.transactions where user_id = 'aaaaaaaa-
         and (select count(*) from public.pending_items where user_id = 'aaaaaaaa-0000-0000-0000-000000000001') = 0,
   '刪帳號：所有資料一起刪掉（含系統帳戶、系統分類）');
 select t.ok((select count(*) from public.accounts where user_id = 'bbbbbbbb-0000-0000-0000-000000000002') = 1, '刪帳號不影響其他人');
+
+
+-- ================= 異地還原：帳號刪掉後，用快照還原到一個新帳號（模擬新的 Supabase 專案重新註冊） =================
+insert into auth.users values ('cccccccc-0000-0000-0000-000000000003', 'c@test');
+select t.throws($$select backup.restore((select data from backup.snapshots where reason = 'manual' order by id desc limit 1), 'dddddddd-0000-0000-0000-000000000004', 'cccccccc-0000-0000-0000-000000000003')$$,
+  '沒有使用者', '備份裡沒有的使用者不能還原');
+select backup.restore((select data from backup.snapshots where reason = 'manual' order by id desc limit 1),
+  'aaaaaaaa-0000-0000-0000-000000000001', 'cccccccc-0000-0000-0000-000000000003');
+select t.ok(backup.user_checksum('cccccccc-0000-0000-0000-000000000003') = (select sum_a from t_backup), '還原到新帳號：每張表的筆數和內容都跟原本一樣');
 
 do $$ begin
   if coalesce(current_setting('t.fail', true), '') <> '' then

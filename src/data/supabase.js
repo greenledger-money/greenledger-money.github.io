@@ -59,6 +59,8 @@ export async function createSupabaseBackend({ url, key, createClient: injected }
     async resetPassword(email) { return unwrap(await sb.auth.resetPasswordForEmail(email, { redirectTo: redirect() })); },
     async updatePassword(password) { return unwrap(await sb.auth.updateUser({ password })); },
     async signOut() { await sb.auth.signOut(); },
+    /** 自動備份的狀態（上次快照、上次異地備份的時間），只有時間沒有資料內容 */
+    async backupStatus() { return unwrap(await sb.rpc('backup_status')); },
     async deleteAccount() {
       unwrap(await sb.rpc('delete_my_account'));
       await sb.auth.signOut({ scope: 'local' });
