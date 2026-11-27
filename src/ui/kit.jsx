@@ -328,10 +328,11 @@ export function UIProvider({ children, extra }) {
   const [dialog, setDialog] = useState(null);
   const [toastMsg, setToastMsg] = useState(null);
   const timer = useRef(null);
-  const toast = useCallback((msg) => {
-    setToastMsg(msg);
+  // toast('已記帳', { action: { label: '再記一筆', onClick } })：附一個按鈕，停留久一點讓人來得及按
+  const toast = useCallback((msg, { action } = {}) => {
+    setToastMsg({ msg, action });
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => setToastMsg(null), 2600);
+    timer.current = setTimeout(() => setToastMsg(null), action ? 5000 : 2600);
   }, []);
   const confirm = useCallback((message, { ok = '確定', danger = false, cancel = '取消' } = {}) => new Promise((resolve) => {
     setDialog({ message, ok, danger, cancel, resolve });
@@ -361,7 +362,16 @@ export function UIProvider({ children, extra }) {
           </div>
         </div>
       )}
-      {toastMsg && <div className="toast" role="status">{toastMsg}</div>}
+      {toastMsg && (
+        <div className={`toast${toastMsg.action ? ' has-action' : ''}`} role="status">
+          <span>{toastMsg.msg}</span>
+          {toastMsg.action && (
+            <button type="button" className="toast-action" onClick={() => { clearTimeout(timer.current); setToastMsg(null); toastMsg.action.onClick(); }}>
+              {toastMsg.action.label}
+            </button>
+          )}
+        </div>
+      )}
     </UICtx.Provider>
   );
 }

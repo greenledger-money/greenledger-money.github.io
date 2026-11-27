@@ -125,12 +125,13 @@ function Shell({ openEntry }) {
 function SignedIn({ backend, user }) {
   const [entry, setEntry] = useState(null);
   const [trade, setTrade] = useState(null);
-  const extra = useMemo(() => ({ openEntry: (o = {}) => setEntry(o), openTrade: (o = {}) => setTrade(o) }), []);
+  // key：連續開兩次記一筆（例如「再記一筆」）時重新建立表單，才會帶入新的資料
+  const extra = useMemo(() => ({ openEntry: (o = {}) => setEntry({ ...o, key: Date.now() }), openTrade: (o = {}) => setTrade(o) }), []);
   return (
     <LedgerProvider backend={backend} user={user} key={user.id}>
       <UIProvider extra={extra}>
         <Shell openEntry={extra.openEntry} />
-        {entry && <EntrySheet original={entry.original} initial={entry.initial} onClose={() => setEntry(null)} />}
+        {entry && <EntrySheet key={entry.key} original={entry.original} initial={entry.initial} onClose={() => setEntry(null)} />}
         {trade && <TradeSheet original={trade.original} initial={trade.initial} onClose={() => setTrade(null)} />}
       </UIProvider>
     </LedgerProvider>

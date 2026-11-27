@@ -51,7 +51,7 @@ function MiniAmount({ label, expr, active, onFocus, currency, placeholder = '0' 
 
 export default function EntrySheet({ original, initial = {}, onClose }) {
   const { data, actions } = useLedger();
-  const { confirm } = useUI();
+  const { confirm, toast, openEntry } = useUI();
   const [run, busy] = useAction();
   const { accById, settings } = data;
   const feeChild = original ? data.transactions.find((t) => t.parent_id === original.id) : null;
@@ -95,6 +95,8 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
   // 台幣帳戶（刷卡、台幣錢包）付外幣：選了外幣就打外幣金額，自動換算台幣；選過的幣別會記住（出國時不用每筆重選）
   const [payCur, setPayCur] = useState(original ? (original.orig_currency ?? null) : (remember.get('tripCurrency') || null));
   const [error, setError] = useState('');
+  // 「再記一筆」帶入的金額：第一次按數字直接取代，按運算子則接在後面（例如 +50）
+  const [freshAmount, setFreshAmount] = useState(!!initial.repeat);
   const [tplName, setTplName] = useState(null);
   const [tab, setTab] = useState(src.type ?? 'expense');
   const [advanced, setAdvanced] = useState(false);
@@ -154,7 +156,9 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
 
   const onKey = (k) => {
     setError('');
-    setEx((e) => ({ ...e, [active]: press(e[active], k) }));
+    const replace = freshAmount && active === 'amount' && /^[0-9.]/.test(k);
+    if (active === 'amount') setFreshAmount(false);
+    setEx((e) => ({ ...e, [active]: press(replace ? '' : e[active], k) }));
     if (active === 'to_amount') setManual((m) => ({ ...m, toAmount: true }));
     if (active === 'twd') setManual((m) => ({ ...m, twd: true }));
     if (active === 'amount' && foreignPay) setManual((m) => ({ ...m, twd: false })); // 改了外幣金額 → 台幣重算
@@ -201,14 +205,27 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
     return form;
   }
 
-  async function save() {
+  /** 「再記一筆」要帶入的資料：剛剛填的內容（不含分帳、手續費、待確認的連結） */
+  const repeatInitial = () => ({
+    repeat: true, type, amount: evaluate(ex.amount) ?? '', account_id: accountId, to_account_id: toAccountId,
+    category_id: type === 'transfer' ? null : categoryId, note, is_exception: isException,
+    occurred_at: fromInputDateTime(when), counterparty: who || null,
+  });
+
+  /** again = true：存好後馬上開一張帶入同樣資料的新表單 */
+  async function save(again = false) {
     let form;
     try { form = buildForm(); } catch (e) { setError(e.message); return; }
-    const ok = await run(() => actions.saveTxn(form, original), original ? '已更新' : split ? '已記帳（分帳）' : '已記帳');
-    if (ok) {
-      if (!original && type !== 'transfer' && currency === 'TWD') remember.set('tripCurrency', foreignPay ?? '');
-      onClose(true);
-    }
+    const next = repeatInitial();
+    const msg = original ? '已更新' : split ? '已記帳（分帳）' : '已記帳';
+    const ok = await run(() => actions.saveTxn(form, original));
+    if (!ok) return;
+    if (!original && type !== 'transfer' && currency === 'TWD') remember.set('tripCurrency', foreignPay ?? '');
+    onClose(true);
+    if (again) { toast(msg); openEntry({ initial: next }); return; }
+    // 新記的一筆：提示裡附「再記一筆」，不想再記就讓它自己消失
+    if (!original && !initial.pending_item_id) toast(msg, { action: { label: '再記一筆', onClick: () => openEntry({ initial: next }) } });
+    else toast(msg);
   }
 
   async function remove() {
@@ -228,7 +245,8 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
     if (ok) setTplName(null);
   }
 
-  const title = initial.pending_item_id ? (initial.source === 'recurring' ? '確認固定收支' : '確認這筆') : original ? '修改' : '記一筆';
+  const title = initial.pending_item_id ? (initial.source === 'recurring' ? '確認固定收支' : '確認這筆') : original ? '修改' : initial.repeat ? '再記一筆' : '記一筆';
+  const canRepeat = !original && !initial.pending_item_id;
   if (locked) {
     return (
       <Sheet title="交易明細" onClose={() => onClose(false)}>
@@ -287,7 +305,7 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
   };
 
   return (
-    <Sheet title={title} onClose={() => onClose(false)} onSave={save} saving={busy} full>
+    <Sheet title={title} onClose={() => onClose(false)} onSave={() => save()} saving={busy} full>
       <div className="etabs" role="tablist">
         {[...(canTemplate ? [['templates', '範本']] : []), ['expense', '支出'], ['income', '收入'], ['transfer', '轉帳']].map(([v, l]) => (
           <button key={v} type="button" role="tab" aria-selected={tab === v} onClick={() => { setTab(v); if (v !== 'templates') changeType(v); }}>{l}</button>
@@ -448,9 +466,10 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
           {error && <div className="error" role="alert">{error}</div>}
 
           {!active && (
-            <div className={original ? 'grid2' : ''}>
+            <div className={original || canRepeat ? 'grid2' : ''}>
               {original && <button type="button" className="btn danger" onClick={remove} disabled={busy}><Icon name="trash" className="chev" />刪除</button>}
-              <button type="button" className="btn primary block" onClick={save} disabled={busy}>{busy ? '儲存中…' : '儲存'}</button>
+              {canRepeat && <button type="button" className="btn" onClick={() => save(true)} disabled={busy}>存好再記一筆</button>}
+              <button type="button" className="btn primary block" onClick={() => save()} disabled={busy}>{busy ? '儲存中…' : '儲存'}</button>
             </div>
           )}
           {active && <Keypad onKey={onKey} onDone={finishKeypad} />}
