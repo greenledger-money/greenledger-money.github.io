@@ -61,6 +61,8 @@ export async function createSupabaseBackend({ url, key, createClient: injected }
     async signOut() { await sb.auth.signOut(); },
     /** 自動備份的狀態（上次快照、上次異地備份的時間），只有時間沒有資料內容 */
     async backupStatus() { return unwrap(await sb.rpc('backup_status')); },
+    /** 用備份檔的資料覆蓋自己帳號的全部資料（覆蓋前資料庫會自動再存一份快照） */
+    async restoreBackup(data, fromUser) { return unwrap(await sb.rpc('restore_my_backup', { p_data: data, p_from_user: fromUser })); },
     async deleteAccount() {
       unwrap(await sb.rpc('delete_my_account'));
       await sb.auth.signOut({ scope: 'local' });

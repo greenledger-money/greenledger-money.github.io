@@ -636,3 +636,24 @@ returns void language sql security definer set search_path = '' as $$
 $$;
 revoke all on function public.backup_mark_offsite(boolean, text) from public, anon, authenticated;
 grant execute on function public.backup_mark_offsite(boolean, text) to service_role;
+
+-- app 內「從備份檔還原」（同 20261129000000_restore_my_backup.sql）
+create or replace function public.restore_my_backup(p_data jsonb, p_from_user uuid default null)
+returns jsonb language plpgsql security definer set search_path = '' set statement_timeout = '120s' as $$
+declare uid uuid := auth.uid(); src uuid := p_from_user;
+begin
+  if uid is null then raise exception '請先登入'; end if;
+  if p_data->'tables'->'transactions' is null then raise exception '這不是小綠記帳的備份檔'; end if;
+  if src is null then
+    if exists (select 1 from jsonb_array_elements(p_data->'tables'->'accounts') e where e->>'user_id' = uid::text) then
+      src := uid;
+    else
+      select (e->>'user_id')::uuid into src from jsonb_array_elements(p_data->'tables'->'transactions') e
+        group by 1 order by count(*) desc limit 1;
+    end if;
+  end if;
+  if src is null then raise exception '備份檔裡沒有任何交易'; end if;
+  return backup.restore(p_data, src, uid, true);
+end $$;
+revoke all on function public.restore_my_backup(jsonb, uuid) from public, anon;
+grant execute on function public.restore_my_backup(jsonb, uuid) to authenticated;

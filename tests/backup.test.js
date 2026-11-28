@@ -67,3 +67,26 @@ describe('備份狀態提醒', async () => {
     expect(h({ snapshot_at: null }).warning).toBe('資料庫還沒有任何快照');
   });
 });
+
+describe('app 內讀備份檔', async () => {
+  const { openBackupFile, backupSummary } = await import('../src/lib/backupFile.js');
+  const full = { ...payload, data: { version: 1, tables: { ...payload.data.tables, transactions: [{ id: 't', user_id: U1 }, { id: 't2', user_id: U1 }, { id: 'u', user_id: U2 }] } } };
+  test('.json.gz 直接讀；摘要用交易最多的帳號', async () => {
+    const { bytes } = await packBackup(full, '');
+    const r = await openBackupFile(bytes, () => { throw new Error('不該問密碼'); });
+    expect(r.summary).toMatchObject({ user: U1, transactions: 2, accounts: 1 });
+  });
+  test('加密檔會問密碼，按取消就不繼續', async () => {
+    const { bytes } = await packBackup(full, PASS);
+    expect((await openBackupFile(bytes, async () => PASS)).summary.transactions).toBe(2);
+    expect(await openBackupFile(bytes, async () => null)).toBe(null);
+  });
+  test('不是備份檔會說清楚', async () => {
+    await expect(openBackupFile(new TextEncoder().encode('{"a":1}'), null)).rejects.toThrow('不是小綠記帳');
+    await expect(openBackupFile(new TextEncoder().encode('hello'), null)).rejects.toThrow('不是小綠記帳');
+  });
+  test('自己的帳號在備份裡就用自己的', () => {
+    expect(backupSummary(full, U2).user).toBe(U1); // U2 沒有帳戶 → 用交易最多的
+    expect(backupSummary(full, U1).user).toBe(U1);
+  });
+});

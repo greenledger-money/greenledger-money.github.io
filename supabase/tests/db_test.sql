@@ -290,6 +290,19 @@ select t.throws($$select public.backup_latest()$$, 'permission', '一般使用�
 select t.throws($$select public.backup_mark_offsite(true, 'x')$$, 'permission', '一般使用者不能改備份紀錄');
 select t.as_user(null);
 select t.throws($$select public.backup_status()$$, 'permission', '未登入看不到備份狀態');
+select t.throws($$select public.restore_my_backup('{}'::jsonb)$$, 'permission', '未登入不能還原');
+-- app 內「從備份檔還原」：先改壞，再用備份檔還原自己的帳號
+select set_config('role', 'postgres', false);
+create temp table t_file as select data from backup.snapshots where reason = 'manual' order by id desc limit 1;
+grant select on t_file to authenticated;
+delete from public.categories where user_id = 'aaaaaaaa-0000-0000-0000-000000000001' and system_key is null and id not in (select category_id from public.transactions where category_id is not null) and id not in (select parent_id from public.categories where parent_id is not null);
+update public.transactions set amount = amount + 1 where user_id = 'aaaaaaaa-0000-0000-0000-000000000001';
+select t.ok(backup.user_checksum('aaaaaaaa-0000-0000-0000-000000000001') <> (select sum_a from t_backup), 'app 內還原前：資料被改壞了');
+select t.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+select t.throws($$select public.restore_my_backup('{"tables": {}}'::jsonb)$$, '不是小綠記帳', '不是備份檔就拒絕');
+select public.restore_my_backup((select data from t_file));
+select set_config('role', 'postgres', false);
+select t.ok(backup.user_checksum('aaaaaaaa-0000-0000-0000-000000000001') = (select sum_a from t_backup), 'app 內還原：資料跟備份完全一樣');
 
 -- ================= 刪除帳號 =================
 select t.as_user('aaaaaaaa-0000-0000-0000-000000000001');

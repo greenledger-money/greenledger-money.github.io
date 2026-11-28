@@ -31,6 +31,12 @@
 
 ## 還原
 
+### 最簡單：在 app 裡還原
+
+1. 到 GitHub 的 `greenledger-backup`，下載要的那天的 `.json.gz`（點檔案 › Download raw file）。
+2. app 的「設定 › 自動備份 › 從備份檔還原」選這個檔，看過內容後按「還原」。
+3. 還原前會自動存一份 `before_restore` 快照；換了新的 Supabase 專案、帳號 id 不同也能用。
+
 ### 情況一：資料改壞了，Supabase 還在
 
 1. 找出正確的 user_id（有交易的那個帳號）和要還原的快照：
