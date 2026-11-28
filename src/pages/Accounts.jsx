@@ -161,14 +161,14 @@ export function AccountDetail({ id }) {
     <Page title={a.name} onBack={() => back('accounts')} right={<button className="link" onClick={() => setEdit(true)}>編輯</button>}>
       <div className="card hero">
         <div>
-          <div className="label">{accountTypeLabel(a.type)}{a.hidden ? '（已隱藏）' : ''} · 目前餘額</div>
+          <div className="label">餘額{a.hidden ? '（已隱藏）' : ''}</div>
           <div className={`big num ${bal < 0 ? 'expense' : ''}`}>{fmt(bal, a.currency, { exact: true })}</div>
           {a.currency !== 'TWD' && data.fx.latest(a.currency) && <div className="small muted">≈ {fmt(bal * data.fx.latest(a.currency))}（匯率 {data.fx.latest(a.currency)}）</div>}
-          <div className="small muted">期初餘額 {fmt(a.opening_balance, a.currency)}</div>
+          <div className="small muted">期初 {fmt(a.opening_balance, a.currency)}</div>
         </div>
         {a.type === 'friends_owe'
           ? <a className="btn primary" href="#friends"><Icon name="people" className="chev" />按人看誰欠多少</a>
-          : <button className="btn primary" onClick={() => openEntry({ initial: { account_id: id, type: 'expense' } })}><Icon name="plus" className="chev" />在這個帳戶記一筆</button>}
+          : <button className="btn primary" onClick={() => openEntry({ initial: { account_id: id, type: 'expense' } })}><Icon name="plus" className="chev" />記一筆</button>}
       </div>
       {hasFuture && <Seg value={kind} onChange={setKind} options={[{ value: 'all', label: '全部' }, { value: 'past', label: '已發生' }, { value: 'future', label: '未到（交割）' }]} />}
       <TxnList txns={txns} accountId={id} dayTotals={false} />

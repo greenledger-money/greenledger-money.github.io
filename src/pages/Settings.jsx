@@ -29,35 +29,34 @@ function BackupSection() {
     setErr(''); setBusy('讀取備份檔…');
     try {
       const opened = await openBackupFile(new Uint8Array(await file.arrayBuffer()),
-        () => prompt('這個備份檔有加密，請輸入備份密碼', { ok: '解開' }));
+        () => prompt('備份密碼', { ok: '解開' }));
       if (!opened) return;
       const s = opened.summary;
       const when = s.takenAt ? `${ymd(new Date(s.takenAt))}（${updatedLabel(s.takenAt)}）` : '日期不明';
       const ok = await confirm(
-        `這份備份是 ${when}，有 ${s.transactions} 筆交易、${s.accounts} 個帳戶、${s.categories} 個分類、${s.trades} 筆股票成交。還原會用這份資料取代你目前全部的資料。還原前會自動再存一份快照，選錯檔也救得回來。`,
+        `${when} 的備份：交易 ${s.transactions} 筆、帳戶 ${s.accounts} 個。會取代目前所有資料（還原前自動存快照）。`,
         { ok: '還原', danger: true });
       if (!ok) return;
-      setBusy('還原中，請不要關掉 app…');
+      setBusy('還原中…');
       await backend.restoreBackup(opened.payload.data, s.user === user.id ? user.id : s.user);
       await actions.reload();
       toast(`已還原 ${s.transactions} 筆交易`);
     } catch (ex) {
-      setErr(`還原失敗：${ex.message || friendlyError(ex)}（目前的資料沒有被改動）`);
+      setErr(`還原失敗：${ex.message || friendlyError(ex)}（資料沒變）`);
     } finally { setBusy(''); }
   };
 
   return (
     <Section title="自動備份">
       <div className="list">
-        <Item left={<Tile name="download" />} title="資料庫快照" sub="每天 03:05，留 30 天＋每月一份" value={<span className="small">{h.snapshot}</span>} />
-        <Item left={<Tile name="download" />} title="異地備份" sub="每天存一份到私人 GitHub repo" value={<span className="small">{h.offsite}</span>} />
+        <Item left={<Tile name="download" />} title="資料庫快照" sub="每天 03:05" value={<span className="small">{h.snapshot}</span>} />
+        <Item left={<Tile name="download" />} title="異地備份" sub="GitHub" value={<span className="small">{h.offsite}</span>} />
       </div>
       {h.warning && <div className="notice warn" role="alert">{h.warning}</div>}
       <label className="btn block" style={{ marginTop: 10, cursor: busy ? 'wait' : 'pointer' }} aria-disabled={!!busy}>
         {busy || '從備份檔還原'}
         <input type="file" accept=".gz,.json,.glbk,application/gzip,application/json" onChange={onFile} disabled={!!busy} style={{ display: 'none' }} />
       </label>
-      <p className="small muted" style={{ margin: '6px 2px 0' }}>到 GitHub 的 greenledger-backup 下載某一天的 .json.gz，再選這個檔案。</p>
       {err && <div className="notice warn" role="alert">{err}</div>}
     </Section>
   );
@@ -113,7 +112,7 @@ export function Export() {
       </Section>
       <Section title="備份">
         <div className="card form">
-          <p className="small muted" style={{ margin: 0 }}>匯出所有交易（含隱藏帳戶），可用 Excel 開啟。</p>
+          <p className="small muted" style={{ margin: 0 }}>含隱藏帳戶，Excel 可開。</p>
           <button className="btn" onClick={() => out(data.transactions, `記帳_全部_${todayStr()}.csv`)}><Icon name="download" className="chev" />匯出全部（{data.transactions.length} 筆）</button>
         </div>
       </Section>
@@ -203,7 +202,7 @@ export function Settings() {
     <Page title="設定" onBack={() => back('more')}>
       <Section title="帳號">
         <div className="list">
-          <Item left={<Tile name="user" />} title={user.demo ? '試用模式' : user.email} sub={user.demo ? '資料只存在這台裝置的瀏覽器' : '用 Email 登入'} />
+          <Item left={<Tile name="user" />} title={user.demo ? '試用模式' : user.email} sub={user.demo ? '資料只存在這台裝置的瀏覽器' : 'Email 登入'} />
         </div>
       </Section>
       {!user.demo && <BackupSection />}
@@ -261,7 +260,6 @@ export function Settings() {
             <NumSetting label="台股交割 T+" hint="工作天" value={s.twSettleDays} min={0} max={10} step={1} onSave={(v) => upd({ twSettleDays: v })} />
             <NumSetting label="美股交割 T+" hint="工作天" value={s.usSettleDays} min={0} max={10} step={1} onSave={(v) => upd({ usSettleDays: v })} />
           </div>
-          <p className="small muted" style={{ margin: 0 }}>新增交易時的預設值。</p>
         </div>
       </Section>
       <Section title="其他">
