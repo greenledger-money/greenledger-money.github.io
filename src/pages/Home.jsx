@@ -1,7 +1,7 @@
 // 首頁：本月收支與結餘、淨資產（含股票市值）、待確認清單、範本、最近明細
 import { BudgetCard } from './Budget.jsx';
 import { useMemo, useRef, useState } from 'react';
-import { useLedger } from '../store.jsx';
+import { useLedger, remember } from '../store.jsx';
 import { Empty, Icon, Money, Page, Section, Tile, go, useAction, useUI } from '../ui/kit.jsx';
 import { TxnRow } from '../ui/TxnList.jsx';
 import { counts, summarize, twdOf } from '../lib/ledger.js';
@@ -171,6 +171,10 @@ export default function Home() {
   const [y, m] = month.split('-').map(Number);
 
   const backup = useBackupHealth();
+  // 備份提醒按叉叉關掉：同一個提醒 7 天內不再出現；換成別的問題就馬上再顯示
+  const [hidden, setHidden] = useState(() => remember.get('backupDismissed'));
+  const showBackup = backup?.warning && !(hidden?.text === backup.warning && Date.now() - hidden.at < 7 * 86400e3);
+  const dismissBackup = () => { const v = { text: backup.warning, at: Date.now() }; remember.set('backupDismissed', v); setHidden(v); };
   const add = () => openEntry(day === today ? {} : { initial: { type: 'expense', occurred_at: new Date(`${day}T12:00:00`).toISOString() } });
 
   return (
@@ -181,10 +185,13 @@ export default function Home() {
       </label>
       <button className="iconbtn" aria-label="設定" onClick={() => go('settings')}><Icon name="gear" /></button>
     </>}>
-      {backup?.warning && (
-        <button type="button" className="notice warn row-flex" style={{ width: '100%', textAlign: 'left', font: 'inherit', border: 0, cursor: 'pointer' }} onClick={() => go('settings')}>
-          <span className="grow">備份提醒：{backup.warning}</span><Icon name="chev" className="chev" />
-        </button>
+      {showBackup && (
+        <div className="notice warn row-flex" style={{ padding: 0, gap: 0 }}>
+          <button type="button" className="row-flex grow" style={{ background: 'none', border: 0, color: 'inherit', textAlign: 'left', font: 'inherit', cursor: 'pointer', padding: '10px 4px 10px 14px', gap: 6 }} onClick={() => go('settings')}>
+            <span className="grow">備份提醒：{backup.warning}</span><Icon name="chev" className="chev" />
+          </button>
+          <button type="button" className="iconbtn" aria-label="關閉備份提醒" onClick={dismissBackup} style={{ color: 'inherit', flex: 'none' }}><Icon name="x" /></button>
+        </div>
       )}
       {homeShowWorth && <WorthCard />}
       <div className="card" style={{ padding: '10px 8px 14px', display: 'grid', gap: 12 }}

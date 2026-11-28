@@ -62,8 +62,11 @@ export default function EntrySheet({ original, initial = {}, onClose }) {
     for (const id of cands) { const a = id && accById.get(id); if (a && (!a.hidden || id === original?.account_id)) return id; }
     return data.accounts.find((a) => !a.hidden && a.type !== 'brokerage' && a.type !== 'friends_owe')?.id ?? null;
   };
+  // 預設分類：'first' 第一個主分類（分類選單最上面那個）｜'last' 上次選的｜'none' 不帶
   const lastCat = (t) => {
-    if (settings.categoryDefault === 'none') return null;
+    const mode = settings.categoryDefault;
+    if (mode === 'none') return null;
+    if (mode === 'first') return data.tree.roots[t]?.find((n) => !n.archived)?.id ?? null;
     const id = remember.get(`lastCategory.${t}`);
     const n = id && data.tree.byId.get(id);
     return n && !n.archived && n.kind === t ? id : null;

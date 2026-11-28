@@ -7,7 +7,7 @@ export const DEFAULT_SETTINGS = {
   theme: 'system',            // 'system' 跟著手機｜'light' 淺色｜'dark' 深色
   // 記帳
   defaultAccountId: null,     // 記帳預設帳戶（null＝上次用的）
-  categoryDefault: 'last',    // 'last' 帶上次選的分類｜'none' 每次自己選
+  categoryDefault: 'last',    // 'first' 帶第一個主分類｜'last' 帶上次選的分類｜'none' 每次自己選
   keypadOnOpen: true,         // 打開記帳就跳出計算機
   // 首頁
   homeShowWorth: true,

@@ -185,7 +185,7 @@ export function Settings() {
             <AccountSelect value={s.defaultAccountId} onChange={(v) => upd({ defaultAccountId: v })} allowEmpty placeholder="上次用的帳戶" />
           </Field>
           <Group label="預設分類">
-            <Seg label="預設分類" value={s.categoryDefault} onChange={(v) => upd({ categoryDefault: v })} options={[{ value: 'last', label: '帶上次選的' }, { value: 'none', label: '每次自己選' }]} />
+            <Seg label="預設分類" value={s.categoryDefault} onChange={(v) => upd({ categoryDefault: v })} options={[{ value: 'first', label: '第一個' }, { value: 'last', label: '上次選的' }, { value: 'none', label: '自己選' }]} />
           </Group>
           <Switch label="打開記帳就跳出計算機" checked={s.keypadOnOpen} onChange={(v) => upd({ keypadOnOpen: v })} />
         </div>
