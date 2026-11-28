@@ -1,11 +1,11 @@
 // 異地備份（Supabase Edge Function）。由資料庫排程（pg_cron）每天呼叫一次：
 //   1. 拿資料庫裡最新的快照（backup_latest）
-//   2. gzip＋AES-256-GCM 加密（密碼是 BACKUP_PASSPHRASE）
-//   3. 推到「私人」GitHub repo：daily/2026/11/2026-11-28.glbk（每天一個檔，git 歷史也會留著）
+//   2. gzip 壓縮；有設 BACKUP_PASSPHRASE 才另外加密（AES-256-GCM）
+//   3. 推到「私人」GitHub repo：daily/2026/11/2026-11-28.json.gz（加密的是 .glbk；每天一個檔，git 歷史也會留著）
 //   4. 結果記到 backup.log（backup_mark_offsite），app 會顯示上次成功的時間
-// 需要的 Edge Function secrets：BACKUP_PASSPHRASE、BACKUP_GITHUB_TOKEN、BACKUP_GITHUB_REPO（owner/repo）
+// 需要的 Edge Function secrets：BACKUP_GITHUB_TOKEN、BACKUP_GITHUB_REPO（owner/repo）；BACKUP_PASSPHRASE 可不設
 // 加密程式和解密腳本共用 backup-crypto.mjs（從 scripts/ 複製過來）。
-import { decryptBackup, encryptBackup, toBase64 } from './backup-crypto.mjs';
+import { packBackup, readBackup, toBase64 } from './backup-crypto.mjs';
 
 const URL_ = Deno.env.get('SUPABASE_URL')!;
 const KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -36,7 +36,7 @@ const gh = (path: string, init: RequestInit = {}) => fetch(`https://api.github.c
 const taipeiDate = (iso: string) => new Date(new Date(iso).getTime() + 8 * 3600e3).toISOString().slice(0, 10);
 
 async function run() {
-  const missing = [!PASS && 'BACKUP_PASSPHRASE', !TOKEN && 'BACKUP_GITHUB_TOKEN', !REPO && 'BACKUP_GITHUB_REPO'].filter(Boolean);
+  const missing = [!TOKEN && 'BACKUP_GITHUB_TOKEN', !REPO && 'BACKUP_GITHUB_REPO'].filter(Boolean);
   if (missing.length) throw new Error(`還沒設定：${missing.join('、')}`);
   if (!/^[\w.-]+\/[\w.-]+$/.test(REPO)) throw new Error('BACKUP_GITHUB_REPO 格式要是 owner/repo');
 
@@ -50,13 +50,13 @@ async function run() {
   const ageH = (Date.now() - new Date(snap.taken_at).getTime()) / 3600e3;
 
   const payload = { format: 'greenledger-backup', snapshot_id: snap.id, taken_at: snap.taken_at, checksum: snap.checksum, counts: snap.counts, data: snap.data };
-  const bytes = await encryptBackup(payload, PASS);
+  const { bytes, ext } = await packBackup(payload, PASS);
   // 上傳前先解開一次，確定這個檔真的還原得回來
-  const back = await decryptBackup(bytes, PASS);
-  if (JSON.stringify(back) !== JSON.stringify(payload)) throw new Error('加密後解不回原本的內容，不上傳');
+  const back = await readBackup(bytes, PASS);
+  if (JSON.stringify(back) !== JSON.stringify(payload)) throw new Error('備份檔解不回原本的內容，不上傳');
 
   const day = taipeiDate(snap.taken_at);
-  const path = `daily/${day.slice(0, 4)}/${day.slice(5, 7)}/${day}.glbk`;
+  const path = `daily/${day.slice(0, 4)}/${day.slice(5, 7)}/${day}.${ext}`;
   const existing = await gh(`/repos/${REPO}/contents/${path}`);
   const sha = existing.ok ? (await existing.json()).sha : undefined;
   const put = await gh(`/repos/${REPO}/contents/${path}`, {

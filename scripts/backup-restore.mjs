@@ -1,14 +1,14 @@
 #!/usr/bin/env bun
 // 備份檔工具（在自己電腦上跑，Bun 或 Node 18 以上都可以）
 //
-//   查看內容：  BACKUP_PASSPHRASE=… bun scripts/backup-restore.mjs info  2026-11-28.glbk
+//   查看內容：  bun scripts/backup-restore.mjs info 2026-11-28.json.gz（加密的 .glbk 要加 BACKUP_PASSPHRASE=…）
 //   產生還原 SQL：BACKUP_PASSPHRASE=… bun scripts/backup-restore.mjs sql 2026-11-28.glbk <舊 user_id> <新 user_id> > restore.sql
 //                然後：psql "<新專案的連線字串>" -f restore.sql
 //
 // 密碼也可以不放環境變數，執行時會問。完整步驟見 docs/backup.md。
 import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
-import { decryptBackup } from './backup-crypto.mjs';
+import { readBackup } from './backup-crypto.mjs';
 
 const ask = (q) => new Promise((res) => { const rl = createInterface({ input: process.stdin, output: process.stderr }); rl.question(q, (a) => { rl.close(); res(a); }); });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -46,8 +46,10 @@ if (import.meta.main ?? process.argv[1]?.endsWith('backup-restore.mjs')) {
     console.error('用法：info <檔案> ｜ sql <檔案> <舊 user_id> <新 user_id> [--force]');
     process.exit(1);
   }
-  const pass = process.env.BACKUP_PASSPHRASE || await ask('備份密碼：');
-  const payload = await decryptBackup(readFileSync(file), pass);
+  const bytes = readFileSync(file);
+  const plain = bytes[0] === 0x1f && bytes[1] === 0x8b;
+  const pass = plain ? '' : (process.env.BACKUP_PASSPHRASE || await ask('備份密碼：'));
+  const payload = await readBackup(bytes, pass);
   if (cmd === 'info') console.log(JSON.stringify(summary(payload), null, 2));
   else process.stdout.write(restoreSql(payload, from, to, { force: flag === '--force' }));
 }

@@ -1,6 +1,6 @@
 // 備份檔：加密、解密、還原 SQL
 import { describe, expect, test } from 'bun:test';
-import { decryptBackup, encryptBackup, toBase64 } from '../scripts/backup-crypto.mjs';
+import { decryptBackup, encryptBackup, packBackup, readBackup, toBase64 } from '../scripts/backup-crypto.mjs';
 import { restoreSql, summary } from '../scripts/backup-restore.mjs';
 
 const U1 = '11111111-1111-1111-1111-111111111111';
@@ -29,6 +29,14 @@ describe('備份檔', () => {
     await expect(decryptBackup(bad, PASS)).rejects.toThrow('解不開');
     await expect(decryptBackup(new TextEncoder().encode('hello world, not a backup file'), PASS)).rejects.toThrow('不是');
     await expect(encryptBackup(payload, 'short')).rejects.toThrow('12');
+  });
+  test('沒設密碼：只壓縮成 .json.gz，讀得回來', async () => {
+    const { bytes, ext } = await packBackup(payload, '');
+    expect(ext).toBe('json.gz');
+    expect(await readBackup(bytes)).toEqual(payload);
+    const enc = await packBackup(payload, PASS);
+    expect(enc.ext).toBe('glbk');
+    expect(await readBackup(enc.bytes, PASS)).toEqual(payload);
   });
   test('base64 跟內建的結果一樣（大檔分段）', () => {
     const big = new Uint8Array(100000).map((_, i) => i % 251);

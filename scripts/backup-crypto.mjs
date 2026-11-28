@@ -1,5 +1,6 @@
 // 備份檔的壓縮與加密（Edge Function 和 解密腳本 共用；改了要複製到 supabase/functions/backup/）
-// 格式：'GLBK1'(5 bytes) + salt(16) + iv(12) + AES-256-GCM 密文（內容是 gzip 過的 JSON）
+// 有設密碼：'GLBK1'(5 bytes) + salt(16) + iv(12) + AES-256-GCM 密文（內容是 gzip 過的 JSON），副檔名 .glbk
+// 沒設密碼：只有 gzip 過的 JSON，副檔名 .json.gz（任何解壓縮工具都打得開）
 // 金鑰：PBKDF2-SHA256(密碼, salt, 310000 次)。只用 Web Crypto，Deno、Node、Bun、瀏覽器都能跑。
 
 const MAGIC = new TextEncoder().encode('GLBK1');
@@ -15,6 +16,23 @@ async function deriveKey(passphrase, salt) {
 async function pipe(bytes, stream) {
   const out = new Response(new Blob([bytes]).stream().pipeThrough(stream));
   return new Uint8Array(await out.arrayBuffer());
+}
+
+/** 沒有密碼：只壓縮 */
+export async function gzipBackup(obj) {
+  return pipe(new TextEncoder().encode(JSON.stringify(obj)), new CompressionStream('gzip'));
+}
+
+/** 備份檔 bytes：有密碼就加密，沒有就只壓縮 */
+export async function packBackup(obj, passphrase) {
+  return passphrase ? { bytes: await encryptBackup(obj, passphrase), ext: 'glbk' } : { bytes: await gzipBackup(obj), ext: 'json.gz' };
+}
+
+/** 讀備份檔：.json.gz 直接解壓縮，.glbk 用密碼解開 */
+export async function readBackup(bytes, passphrase) {
+  const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  if (b[0] === 0x1f && b[1] === 0x8b) return JSON.parse(new TextDecoder().decode(await pipe(b, new DecompressionStream('gzip'))));
+  return decryptBackup(b, passphrase);
 }
 
 /** 物件 → 加密後的 bytes */
